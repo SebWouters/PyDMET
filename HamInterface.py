@@ -74,25 +74,18 @@ class HamInterface:
         return linco
         
     def getTmatFunction( self, i, j ):
-        co_i = self.getLatticeCoordinate( i )
-        co_j = self.getLatticeCoordinate( j )
-        difference = np.zeros([ self.dim ], dtype=int)
+        difference = np.absolute( self.getLatticeCoordinate( i ) - self.getLatticeCoordinate( j ) )
         numDiffer  = 0
         lastDiffer = -1
-        neighBours = True
         for cnt in range(0, self.dim):
-            if ( co_i[ cnt ] >= co_j[ cnt ] ):
-                difference[ cnt ] = co_i[ cnt ] - co_j[ cnt ]
-            else:
-                difference[ cnt ] = co_j[ cnt ] - co_i[ cnt ]
             if ( difference[ cnt ] == 1 ) or ( difference[ cnt ] == self.size[ cnt ] - 1 ):
                 lastDiffer = cnt
                 numDiffer += 1
             if ( difference[ cnt ] > 1 ) and ( difference[ cnt ] < self.size[ cnt ] - 1 ):
-                neighBours = False
-        if ( neighBours == False ) or ( numDiffer == 0 ) or ( numDiffer > 1 ):
+                return 0.0
+        if ( numDiffer != 1 ):
             return 0.0
-        else: # numDiffer == 1 and neighBours == True
+        else:
             if ( difference[ lastDiffer ] == 1 ):
                 return -1.0
             else:

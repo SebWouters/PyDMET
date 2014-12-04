@@ -20,26 +20,71 @@
 # This file contains two functions to compute the bath orbitals from the embedding RHF solution
 
 import numpy as np
-
-def ConstructEmbedding1RDM( impurityOrbs, solutionRHF, numPairs ):
     
-    DoublyOccOrbs = solutionRHF[:, 0:numPairs]
-    OneRDM = 2 * np.dot( DoublyOccOrbs , DoublyOccOrbs.T )
-    environOrbs = 1 - impurityOrbs
-    booleanMat = np.dot( np.matrix( environOrbs ).T , np.matrix( environOrbs ) ) == 1
-    numEnvironOrbs = np.sum( environOrbs )
-    embedding1RDM = np.reshape( OneRDM[ booleanMat ], ( numEnvironOrbs , numEnvironOrbs ) )
-    return embedding1RDM
+def Construct1RDM_groundstate( solutionRHF, numPairs ):
 
-def ConstructBathOrbitals( impurityOrbs, embedding1RDM, numBathOrbs ):
+    DoublyOccOrbs = solutionRHF[:, 0:numPairs]
+    GS_OneRDM = 2 * np.dot( DoublyOccOrbs , DoublyOccOrbs.T )
+    return GS_OneRDM
+
+def Construct1RDM_addition( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
+
+    # vector(l) = \sum_{alpha ### VIRTUAL ###} C_{l,alpha} C^+_{alpha,i} / ( omega - epsilon_alpha + I*eta)
+    Vector  = 1.0 / ( omega - eigsRHF[ numPairs: ] + 1j*eta )
+    Vector  = np.multiply( Vector , solutionRHF[ orbital_i, numPairs: ] )
+    Vector  = np.matrix( np.dot( solutionRHF[ :, numPairs: ] , Vector.T ) )
+    Overlap = np.dot( Vector, Vector.H ).real[0,0]
+    Matrix  = np.dot( Vector.H, Vector ).real
+    
+    addition1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) + Matrix / Overlap
+    return ( addition1RDM , Overlap )
+    
+def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
+
+    # vector(l) = \sum_{alpha ### OCCUPIED ###} C_{l,alpha} C^+_{alpha,i} / ( omega - epsilon_alpha + I*eta)
+    Vector  = 1.0 / ( omega - eigsRHF[ 0:numPairs ] + 1j*eta )
+    Vector  = np.multiply( Vector , solutionRHF[ orbital_i, 0:numPairs ] )
+    Vector  = np.matrix( np.dot( solutionRHF[ :, 0:numPairs ] , Vector.T ) )
+    Overlap = np.dot( Vector, Vector.H ).real[0,0]
+    Matrix  = np.dot( Vector.H, Vector ).real
+
+    removal1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) - Matrix / Overlap # Minus sign!
+    return ( removal1RDM , Overlap )
+    
+def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
+
+    # matrix(alpha,beta) = C^+_{alpha,i} C_{i,beta} / ( omega - ( epsilon_alpha - epsilon_beta ) + I*eta )
+    nRows, nCols = solutionRHF.shape
+    numVirt = nRows - numPairs
+    Matrix = np.zeros([ nRows - numPairs, numPairs ], dtype=complex) # First index (alpha) virtual, second index (beta) occupied
+    for virt in range(numPairs, nRows):
+        for occ in range(0, numPairs):
+            Matrix[ virt - numPairs , occ ] = solutionRHF[ orbital_i, virt ] * solutionRHF[ orbital_i, occ ] / ( omega - eigsRHF[ virt ] + eigsRHF[ occ ] + 1j*eta )
+    Matrix = np.matrix( Matrix )
+    
+    Overlap = 2 * np.trace( np.dot( Matrix , Matrix.H ) ).real
+    Matrix1 = 2 * np.dot( solutionRHF[ : , numPairs:  ] , np.dot( np.dot( Matrix, Matrix.H ) , solutionRHF[ : , numPairs:  ].T ) ).real
+    Matrix2 = 2 * np.dot( solutionRHF[ : , 0:numPairs ] , np.dot( np.dot( Matrix.H, Matrix ) , solutionRHF[ : , 0:numPairs ].T ) ).real
+    
+    forward1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) + ( Matrix1 - Matrix2 ) / Overlap
+    return ( forward1RDM , Overlap )
+    
+def Construct1RDM_backward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
+
+    return Construct1RDM_forward( orbital_i, -omega, -eta, eigsRHF, solutionRHF, numPairs )
+    
+def ConstructBathOrbitals( impurityOrbs, OneRDM, numBathOrbs ):
+
+    embeddingOrbs = 1 - impurityOrbs
+    isEmbedding = np.dot( np.matrix( embeddingOrbs ).T , np.matrix( embeddingOrbs ) ) == 1
+    numEmbedOrbs = np.sum( embeddingOrbs )
+    embedding1RDM = np.reshape( OneRDM[ isEmbedding ], ( numEmbedOrbs , numEmbedOrbs ) )
 
     numImpOrbs = np.sum( impurityOrbs )
-    if ( numBathOrbs == None ):
-        numBathOrbs = numImpOrbs
     numTotalOrbs = len( impurityOrbs )
         
     eigenvals, eigenvecs = np.linalg.eigh( embedding1RDM )
-    idx = np.maximum( -eigenvals, eigenvals - 2.0 ).argsort()
+    idx = np.maximum( -eigenvals, eigenvals - 2.0 ).argsort() # Occupation numbers closest to 1 come first
     eigenvals = eigenvals[idx]
     eigenvecs = eigenvecs[:,idx]
     pureEnvironEigVals = -eigenvals[numBathOrbs:]

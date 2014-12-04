@@ -67,7 +67,6 @@ def Solve( HamDMET, NelecActiveSpace, printoutput=False ):
         theFCI.FillRandom( theFCI.getVecLength() , GSvector )
         EnergyCheMPS2 = theFCI.GSDavidson( GSvector )
         SpinSquared = theFCI.CalcSpinSquared( GSvector )
-        assert( abs(SpinSquared) < 1e-8 ) # Only spin projection zero was targeted. Check that the spin itself is also zero.
         TwoRDM = np.zeros( [ L**4 ], dtype=ctypes.c_double )
         theFCI.Fill2RDM( GSvector, TwoRDM )
         TwoRDM = TwoRDM.reshape( [L, L, L, L], order='F' )
@@ -76,6 +75,7 @@ def Solve( HamDMET, NelecActiveSpace, printoutput=False ):
     
         TwoS  = 0
         Irrep = 0
+        SpinSquared = 0  # As CheMPS2 factorizes configuration state functions into matrix product states
         assert( NelecActiveSpace % 2 == 0 )
         Prob  = PyCheMPS2.PyProblem( HamCheMPS2, TwoS, NelecActiveSpace, Irrep )
 
@@ -103,6 +103,9 @@ def Solve( HamDMET, NelecActiveSpace, printoutput=False ):
         sys.stdout.flush()
         os.dup2(new_stdout, old_stdout)
         os.close(new_stdout)
+
+    if ( abs(SpinSquared) > 1e-8 ):
+        print "Exact solution :: WARNING : < S^2 > =", SpinSquared
 
     # Calculate the 1RDM from the 2RDM
     OneRDM = np.einsum( 'ikjk->ij', TwoRDM ) / ( NelecActiveSpace - 1 )

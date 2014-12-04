@@ -22,11 +22,12 @@ import HamFull
 import DMETham
 import LinalgWrappers
 import DMETorbitals
+import DMETresponseOrbs
 import SolveCorrelatedProblem
 import MinimizeCostFunction
 import numpy as np
 
-class HubbardDMET:
+class HubbardResponseDMET:
 
     def __init__( self, lattice_size, cluster_size, HubbardU, Nelectrons, antiPeriodic=True ):
         self.lattice_size = lattice_size
@@ -77,6 +78,17 @@ class HubbardDMET:
             # Get the RHF ground state 1RDM for the embedding orbitals and construct the bath orbitals
             groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, self.Nelectrons/2 )
             dmetOrbs = DMETorbitals.ConstructBathOrbitals( impurityOrbs, groundstate1RDM, numBathOrbs )
+            
+            orbital_i = 0
+            omega = 1.23
+            eta = 0.05
+            add1RDM, addOverlap = DMETorbitals.Construct1RDM_addition( orbital_i, omega, eta, eigenvals, solutionRHF, self.Nelectrons/2 )
+            rem1RDM, remOverlap = DMETorbitals.Construct1RDM_removal( orbital_i, omega, eta, eigenvals, solutionRHF, self.Nelectrons/2 )
+            fow1RDM, fowOverlap = DMETorbitals.Construct1RDM_forward( orbital_i, omega, eta, eigenvals, solutionRHF, self.Nelectrons/2 )
+            print "addOverlap =", addOverlap
+            print "remOverlap =", remOverlap
+            print "fowOverlap =", fowOverlap
+            exit()
 
             # Construct the DMET Hamiltonian and get the exact solution
             HamDMET = DMETham.DMETham(Ham, HamAugment, dmetOrbs, impurityOrbs, numImpOrbs, numBathOrbs)

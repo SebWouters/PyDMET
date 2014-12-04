@@ -18,12 +18,13 @@
 '''
 
 import numpy as np
-import Redo2D_PRL
+import HubbardResponseDMET
 
+lattice_size = np.array( [24, 48], dtype=int )
+cluster_size = np.array( [ 2,  2], dtype=int )
+Nelectrons   = ( np.prod( lattice_size ) * 16 ) / 24
+antiPeriodic = True
 HubbardU = 4.0
-Filling, Energy1, Energy4 = Redo2D_PRL.CalculateEnergies( HubbardU )
 
-print "Hubbard U =",HubbardU
-print "Filling ; Energy/site for 1x1 cluster ; Energy/site for 2x2 cluster"
-print np.column_stack((Filling, Energy1, Energy4))
-
+theDMET = HubbardResponseDMET.HubbardResponseDMET( lattice_size, cluster_size, HubbardU, Nelectrons, antiPeriodic )
+EnergyPerSite = theDMET.Solve()
