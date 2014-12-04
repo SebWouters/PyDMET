@@ -42,20 +42,10 @@ def FCIGroundState( Ham, Nel_up, Nel_down, Irrep, startRandom ):
     theFCI.CalcSpinSquared( GSvector )
     return ( EnergyFCI , GSvector, theFCI )
 
-
-
-    
-def DensityResponseGF( theFCI, GSenergy, GSvector, orb_alpha , orb_beta , omega, eta ):
-
-    RePart , ImPart = theFCI.DensityResponseGF( omega, eta, orb_alpha, orb_beta, GSenergy, GSvector )
-    return RePart + 1j * ImPart
-
-
 Initializer = PyCheMPS2.PyInitialize()
 Initializer.Init()
 
 Ham = ReadinHamiltonianPsi4.Read('/home/seba/CheMPS2/tests/matrixelements/N2_N14_S0_d2h_I0.dat')
-
 
 Nel_up = 7
 Nel_down = 7
@@ -75,6 +65,22 @@ RePart , ImPart = theFCI.RetardedGF( omega, eta, orb_alpha, orb_beta, isUp, GSen
 print "LDOS( omega =", omega, "; eta =", eta, "; alpha =", orb_alpha, "; beta =", orb_beta, ") =", - ImPart / m.pi
 print "                              The result should be close to 5.15931306704457"
 
+Re2RDMadd = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+Im2RDMadd = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+RePartAdd , ImPartAdd = theFCI.RetardedGF_addition( omega, eta, orb_alpha, orb_beta, isUp, GSenergy, GSvector, Ham, Re2RDMadd, Im2RDMadd )
+Re2RDMadd = Re2RDMadd.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+Im2RDMadd = Im2RDMadd.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+
+Re2RDMrem = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+Im2RDMrem = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+RePartRem , ImPartRem = theFCI.RetardedGF_removal( omega, eta, orb_alpha, orb_beta, isUp, GSenergy, GSvector, Ham, Re2RDMrem, Im2RDMrem )
+Re2RDMrem = Re2RDMrem.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+Im2RDMrem = Im2RDMrem.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+
+print "LDOS( omega =", omega, "; eta =", eta, "; alpha =", orb_alpha, "; beta =", orb_beta, ") =", - (ImPartAdd + ImPartRem) / m.pi
+print "                              The result should be close to 5.15931306704457"
+print "Addition GF =", RePartAdd + 1j*ImPartAdd," and removal GF =", RePartRem + 1j*ImPartRem
+
 orb_alpha = 3
 orb_beta  = 3
 omega     = 0.7358
@@ -82,6 +88,22 @@ eta       = 0.001
 RePart , ImPart = theFCI.DensityResponseGF( omega, eta, orb_alpha, orb_beta, GSenergy, GSvector )
 print "LDDR( omega =", omega, "; eta =", eta, "; alpha =", orb_alpha, "; beta =", orb_beta, ") =", - ImPart / m.pi
 print "                                The result should be close to 1.58755549193702"
+
+Re2RDMfw = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+Im2RDMfw = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+RePartFW , ImPartFW = theFCI.DensityResponseGF_forward( omega, eta, orb_alpha, orb_beta, GSenergy, GSvector, Re2RDMfw, Im2RDMfw )
+Re2RDMfw = Re2RDMfw.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+Im2RDMfw = Im2RDMfw.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+
+Re2RDMbw = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+Im2RDMbw = np.zeros( [ Ham.getL()*Ham.getL()*Ham.getL()*Ham.getL() ], dtype=ctypes.c_double )
+RePartBW , ImPartBW = theFCI.DensityResponseGF_backward( omega, eta, orb_alpha, orb_beta, GSenergy, GSvector, Re2RDMbw, Im2RDMbw )
+Re2RDMbw = Re2RDMbw.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+Im2RDMbw = Im2RDMbw.reshape( [Ham.getL(), Ham.getL(), Ham.getL(), Ham.getL()], order='F' )
+
+print "LDDR( omega =", omega, "; eta =", eta, "; alpha =", orb_alpha, "; beta =", orb_beta, ") =", - (ImPartFW - ImPartBW) / m.pi
+print "                                The result should be close to 1.58755549193702"
+print "Forward GF =", RePartFW + 1j*ImPartFW," and backward GF =", RePartBW + 1j*ImPartBW
 
 del theFCI
 del Ham
