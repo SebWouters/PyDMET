@@ -17,11 +17,9 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 '''
 
-# Minimize the RMS difference of the correlated and mean-field 1-RDMs by
-# changing the DMET potential on the impurity sites in the mean-field problem
-
 import numpy as np
 import LinalgWrappers
+import DMETorbitals
 from scipy.optimize import minimize
 
 def UmatFlat2Square( umatflat, lindim ):
@@ -41,34 +39,81 @@ def UmatSquare2Flat( umatsquare, lindim ):
             umatflat[ row + ( col * ( col + 1 ) ) / 2 ] = umatsquare[row, col]
     return umatflat
 
-def OneRDMdifference( umatsquare, OneRDMcorr, HamDMET, numPairs ):
+def GS_1RDMdifference( umatsquare, GS_1RDM, HamDMET, numPairs ):
 
     HamDMET.OverwriteImpurityUmat( umatsquare )
-    eigenvals, eigenvecs = LinalgWrappers.SortedEigSymmetric( HamDMET.Tmat )
-    if ( eigenvals[ numPairs ] - eigenvals[ numPairs-1 ] < 1e-8 ):
+    energiesRHF, solutionRHF = LinalgWrappers.SortedEigSymmetric( HamDMET.Tmat )
+    if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
         print "ERROR: The single particle gap is zero!"
-        assert( eigenvals[ numPairs ] - eigenvals[ numPairs-1 ] >= 1e-8 )
-    OneRDMmf = 2 * np.dot( eigenvecs[ :, 0:numPairs ] , eigenvecs[ :, 0:numPairs ].T )
-    return OneRDMcorr - OneRDMmf
+        assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
+    
+    GS_1RDM_Slater = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
+    errorGS = GS_1RDM - GS_1RDM_Slater
+    assert( abs( np.trace(errorGS) ) < 1e-8 ) # If not OK, the particle number is wrong in one of the two 1-RDMs
+    return errorGS
 
-def CostFunction( umatflat, OneRDMcorr, HamDMET, numPairs ):
+def CostFunction( umatflat, GS_1RDM, HamDMET, numPairs ):
 
     umatsquare = UmatFlat2Square( umatflat, HamDMET.numImpOrbs )
-    error = OneRDMdifference( umatsquare, OneRDMcorr, HamDMET, numPairs )
+    error = GS_1RDMdifference( umatsquare, GS_1RDM, HamDMET, numPairs )
     return np.linalg.norm( error )**2
-
-def Minimize( umat_guess, OneRDMcorr, HamDMET, NelecActiveSpace ):
+    
+def Minimize( umat_guess, GS_1RDM, HamDMET, NelecActiveSpace ):
 
     umatflat = UmatSquare2Flat( umat_guess, HamDMET.numImpOrbs )
 
+    assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
-    result = minimize( CostFunction, umatflat, args=(OneRDMcorr, HamDMET, numPairs), options={'disp': False} )
+    result = minimize( CostFunction, umatflat, args=(GS_1RDM, HamDMET, numPairs), options={'disp': False} )
     if ( result.success==False ):
-        print "Minimize ::",result.message
-    print "Minimize :: Cost function after convergence =",result.fun
+        print "   Minimize ::",result.message
+    print "   Minimize :: Cost function after convergence =",result.fun
     
     umatsquare = UmatFlat2Square( result.x, HamDMET.numImpOrbs )
-            
+    return umatsquare
+    
+def RESP_1RDM_differences( umatsquare, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve ):
+
+    HamDMET.OverwriteImpurityUmat( umatsquare )
+    energiesRHF, solutionRHF = LinalgWrappers.SortedEigSymmetric( HamDMET.Tmat )
+    if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
+        print "ERROR: The single particle gap is zero!"
+        assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
+
+    GS_1RDM_Slater = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
+    if (toSolve=='A'):
+        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_addition( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+    if (toSolve=='R'):
+        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_removal(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+    if (toSolve=='F'):
+        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_forward(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+    if (toSolve=='B'):
+        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_backward( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+    
+    errorGS   = GS_1RDM   - GS_1RDM_Slater
+    errorRESP = RESP_1RDM - RESP_1RDM_Slater
+    assert( abs( np.trace(errorGS  ) ) < 1e-8 ) # If not OK, the particle number is wrong in one of the two 1-RDMs
+    assert( abs( np.trace(errorRESP) ) < 1e-8 ) # If not OK, the particle number is wrong in one of the two 1-RDMs
+    return ( errorGS, errorRESP )
+    
+def CostFunctionResponse( umatflat, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve, prefactResponseRDM ):
+
+    umatsquare = UmatFlat2Square( umatflat, HamDMET.numImpOrbs )
+    errorGS, errorRESP = RESP_1RDM_differences( umatsquare, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve )
+    return ( 1.0 - prefactResponseRDM ) * np.linalg.norm( errorGS )**2 + prefactResponseRDM * np.linalg.norm( errorRESP )**2
+    
+def MinimizeResponse( umat_guess, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve, prefactResponseRDM ):
+
+    umatflat = UmatSquare2Flat( umat_guess, HamDMET.numImpOrbs )
+
+    assert( NelecActiveSpace % 2 == 0 )
+    numPairs = NelecActiveSpace / 2
+    result = minimize( CostFunctionResponse, umatflat, args=(GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve, prefactResponseRDM), options={'disp': False} )
+    if ( result.success==False ):
+        print "   Minimize ::",result.message
+    print "   Minimize :: Cost function after convergence =",result.fun
+
+    umatsquare = UmatFlat2Square( result.x, HamDMET.numImpOrbs )
     return umatsquare
     
     

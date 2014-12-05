@@ -18,12 +18,31 @@
 '''
 
 import numpy as np
-import Redo2D_PRL
+import GroundState2D
 
 HubbardU = 4.0
-Filling, Energy1, Energy4 = Redo2D_PRL.CalculateEnergies( HubbardU )
+Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
 
 print "Hubbard U =",HubbardU
 print "Filling ; Energy/site for 1x1 cluster ; Energy/site for 2x2 cluster"
 print np.column_stack((Filling, Energy1, Energy4))
+
+'''import numpy as np
+import HubbardDMET
+
+lattice_size = np.array( [24, 48], dtype=int )
+cluster_size = np.array( [2, 2], dtype=int )
+Nelectrons   = ( np.prod( lattice_size ) * 16 ) / 24
+antiPeriodic = True
+
+HubbardU = 4.0
+theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
+#EnergyPerSite = theDMET.SolveGroundState( Nelectrons )
+
+orb_i = 0
+omega = 2.345
+eta   = 0.05
+numBathOrbs = 6
+toSolve = 'R'
+EnergyPerSite, GFvalue = theDMET.SolveResponse( Nelectrons, orb_i, omega, eta, numBathOrbs, toSolve )'''
 

@@ -17,8 +17,6 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 '''
 
-# This file contains two functions to compute the bath orbitals from the embedding RHF solution
-
 import numpy as np
     
 def Construct1RDM_groundstate( solutionRHF, numPairs ):
@@ -33,11 +31,13 @@ def Construct1RDM_addition( orbital_i, omega, eta, eigsRHF, solutionRHF, numPair
     Vector  = 1.0 / ( omega - eigsRHF[ numPairs: ] + 1j*eta )
     Vector  = np.multiply( Vector , solutionRHF[ orbital_i, numPairs: ] )
     Vector  = np.matrix( np.dot( solutionRHF[ :, numPairs: ] , Vector.T ) )
+    if (Vector.shape[0] > 1):
+        Vector = Vector.T # Now certainly row-like matrix (shape = 1 x len(vector))
     Overlap = np.dot( Vector, Vector.H ).real[0,0]
     Matrix  = np.dot( Vector.H, Vector ).real
     
     addition1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) + Matrix / Overlap
-    return ( addition1RDM , Overlap )
+    return addition1RDM
     
 def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
 
@@ -45,17 +45,18 @@ def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs
     Vector  = 1.0 / ( omega - eigsRHF[ 0:numPairs ] + 1j*eta )
     Vector  = np.multiply( Vector , solutionRHF[ orbital_i, 0:numPairs ] )
     Vector  = np.matrix( np.dot( solutionRHF[ :, 0:numPairs ] , Vector.T ) )
+    if (Vector.shape[0] > 1):
+        Vector = Vector.T # Now certainly row-like matrix (shape = 1 x len(vector))
     Overlap = np.dot( Vector, Vector.H ).real[0,0]
     Matrix  = np.dot( Vector.H, Vector ).real
 
     removal1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) - Matrix / Overlap # Minus sign!
-    return ( removal1RDM , Overlap )
+    return removal1RDM
     
 def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
 
     # matrix(alpha,beta) = C^+_{alpha,i} C_{i,beta} / ( omega - ( epsilon_alpha - epsilon_beta ) + I*eta )
     nRows, nCols = solutionRHF.shape
-    numVirt = nRows - numPairs
     Matrix = np.zeros([ nRows - numPairs, numPairs ], dtype=complex) # First index (alpha) virtual, second index (beta) occupied
     for virt in range(numPairs, nRows):
         for occ in range(0, numPairs):
@@ -67,7 +68,7 @@ def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs
     Matrix2 = 2 * np.dot( solutionRHF[ : , 0:numPairs ] , np.dot( np.dot( Matrix.H, Matrix ) , solutionRHF[ : , 0:numPairs ].T ) ).real
     
     forward1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) + ( Matrix1 - Matrix2 ) / Overlap
-    return ( forward1RDM , Overlap )
+    return forward1RDM
     
 def Construct1RDM_backward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
 
@@ -76,7 +77,10 @@ def Construct1RDM_backward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPair
 def ConstructBathOrbitals( impurityOrbs, OneRDM, numBathOrbs ):
 
     embeddingOrbs = 1 - impurityOrbs
-    isEmbedding = np.dot( np.matrix( embeddingOrbs ).T , np.matrix( embeddingOrbs ) ) == 1
+    embeddingOrbs = np.matrix( embeddingOrbs )
+    if (embeddingOrbs.shape[0] > 1):
+        embeddingOrbs = embeddingOrbs.T # Now certainly row-like matrix (shape = 1 x len(vector))
+    isEmbedding = np.dot( embeddingOrbs.T , embeddingOrbs ) == 1
     numEmbedOrbs = np.sum( embeddingOrbs )
     embedding1RDM = np.reshape( OneRDM[ isEmbedding ], ( numEmbedOrbs , numEmbedOrbs ) )
 
@@ -91,6 +95,9 @@ def ConstructBathOrbitals( impurityOrbs, OneRDM, numBathOrbs ):
     pureEnvironEigVecs = eigenvecs[:,numBathOrbs:]
     idx = pureEnvironEigVals.argsort()
     eigenvecs[:,numBathOrbs:] = pureEnvironEigVecs[:,idx]
+    pureEnvironEigVals = -pureEnvironEigVals
+    DiscardOccupation = np.sum( np.fabs( np.minimum( pureEnvironEigVals, 2.0 - pureEnvironEigVals ) ) )
+    NelecEnvironment  = np.sum( pureEnvironEigVals ) # Number of electrons which are not on impurity or bath orbitals (float!)
     
     for counter in range(0, numImpOrbs):
         eigenvecs = np.insert(eigenvecs, counter, 0.0, axis=1) #Stack columns with zeros in the beginning
@@ -108,5 +115,5 @@ def ConstructBathOrbitals( impurityOrbs, OneRDM, numBathOrbs ):
     # eigenvecs[ : , 0:numImpOrbs ]                      = impurity orbitals
     # eigenvecs[ : , numImpOrbs:numImpOrbs+numBathOrbs ] = bath orbitals
     # eigenvecs[ : , numImpOrbs+numBathOrbs: ]           = pure environment orbitals in decreasing order of occupation number
-    return eigenvecs
+    return ( eigenvecs, NelecEnvironment, DiscardOccupation )
 
