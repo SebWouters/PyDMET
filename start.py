@@ -19,30 +19,38 @@
 
 import numpy as np
 import GroundState2D
+import LDOS2D
+import LDDR2D
 
-HubbardU = 4.0
-Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
+case2run = 3
 
-print "Hubbard U =",HubbardU
-print "Filling ; Energy/site for 1x1 cluster ; Energy/site for 2x2 cluster"
-print np.column_stack((Filling, Energy1, Energy4))
+if ( case2run == 1 ):
 
-'''import numpy as np
-import HubbardDMET
+    HubbardU = 4.0
+    Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
 
-lattice_size = np.array( [24, 48], dtype=int )
-cluster_size = np.array( [2, 2], dtype=int )
-Nelectrons   = ( np.prod( lattice_size ) * 16 ) / 24
-antiPeriodic = True
+    print "Hubbard U =",HubbardU
+    print "Filling ; Energy/site for 1x1 cluster ; Energy/site for 2x2 cluster"
+    print np.column_stack((Filling, Energy1, Energy4))
 
-HubbardU = 4.0
-theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
-#EnergyPerSite = theDMET.SolveGroundState( Nelectrons )
+if ( case2run == 2 ):
 
-orb_i = 0
-omega = 2.345
-eta   = 0.05
-numBathOrbs = 6
-toSolve = 'R'
-EnergyPerSite, GFvalue = theDMET.SolveResponse( Nelectrons, orb_i, omega, eta, numBathOrbs, toSolve )'''
+    HubbardU   = 10.0
+    eta        = 0.05
+    lowerbound = -3.5
+    upperbound = 3.5
+    stepsize   = 0.2
+    # Local density of states spectral function
+    Omegas, LDOS = LDOS2D.CalculateLDOS( HubbardU, lowerbound, upperbound, stepsize, eta )
+    print np.column_stack((Omegas, LDOS))
 
+if ( case2run == 3 ):
+
+    HubbardU   = 10.0
+    eta        = 0.05
+    maxomega   = 14.0
+    stepsize   = 0.2
+    # Local density density response spectral function
+    Omegas, LDDR = LDDR2D.CalculateLDDR( HubbardU, maxomega, stepsize, eta )
+    print np.column_stack((Omegas, LDDR))
+    

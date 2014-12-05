@@ -156,7 +156,6 @@ class HubbardDMET:
             HamDMET = DMETham.DMETham(self.Ham, HamAugment, dmetOrbs, self.impurityOrbs, numImpOrbs, numBathOrbs)
             GSenergyPerSite, GFvalue, GS_1RDM, RESP_1RDM = SolveCorrelatedResponse.Solve( HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve )
 
-            #umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve, 0.0 )
             umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             print "   DMET :: The energy per site (correlated problem) =",GSenergyPerSite
