@@ -41,7 +41,7 @@ def CalculateEnergies( HubbardU ):
             antiPeriodic = True
 
             theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
-            EnergyPerSite = theDMET.SolveGroundState( Nelectrons )
+            EnergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
 
             if ( clustercounter==0 ):
                 Filling.append( electroncounter / 24.0 )

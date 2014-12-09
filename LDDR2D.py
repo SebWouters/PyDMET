@@ -21,10 +21,9 @@ import numpy as np
 import math
 import HubbardDMET
 
-def CalculateLDDR( HubbardU, maxomega, stepsize, eta ):
+def CalculateLDDR( HubbardU, Omegas, eta ):
 
-    LDDR   = []
-    Omegas = []
+    LDDR = []
 
     lattice_size = np.array( [24, 48], dtype=int )
     cluster_size = np.array( [ 2,  2], dtype=int )
@@ -34,14 +33,14 @@ def CalculateLDDR( HubbardU, maxomega, stepsize, eta ):
     orbital_i    = 0 # Take upper left corner of the impurity to kick out an electron (counting within "cluster_size" as in contiguous fortran array)
     
     theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
+    GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
     
-    for omega in np.arange(0.0, maxomega, stepsize):
+    for omega in Omegas:
 
-        EperSite_forward,  GF_forward   = theDMET.SolveResponse( Nelectrons, orbital_i, omega, eta, numBathOrbs, 'F' )
-        EperSite_backward, GF_backward  = theDMET.SolveResponse( Nelectrons, orbital_i, omega, eta, numBathOrbs, 'B' )
+        EperSite_forward,  GF_forward   = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'F' )
+        EperSite_backward, GF_backward  = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'B' )
         SpectralFunction = - ( GF_forward.imag - GF_backward.imag ) / math.pi
-        Omegas.append( omega )
         LDDR.append( SpectralFunction )
     
-    return ( Omegas, LDDR )
+    return LDDR
     

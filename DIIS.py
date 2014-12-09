@@ -17,13 +17,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 '''
 
-#  This class performs the direct inversion of iterative subspaces
-
 import numpy as np
 
 class DIIS:
 
-    def __init__( self, numVecs=8 ):
+    def __init__( self, numVecs ):
         self.errors  = []
         self.states  = []
         self.numVecs = numVecs
@@ -43,17 +41,15 @@ class DIIS:
             mat[ cnt, nStates ] = 1.0
             mat[ nStates, cnt ] = 1.0
             for cnt2 in range(cnt, nStates):
-                mat[ cnt, cnt2 ] = np.trace( np.dot( self.errors[cnt] , self.errors[cnt2].T ) )
+                mat[ cnt, cnt2 ] = np.sum( np.multiply( self.errors[cnt] , self.errors[cnt2] ) )
                 mat[ cnt2, cnt ] = mat[ cnt, cnt2 ]
         vec = np.zeros([ nStates+1 ], dtype=float)
         vec[ nStates ] = 1.0
         coeff = np.linalg.tensorsolve(mat, vec)
         coeff = coeff[:-1]
-        theerror = coeff[0] * self.errors[0]
         thestate = coeff[0] * self.states[0]
         for cnt in range(1, len(coeff)):
-            theerror += coeff[cnt] * self.errors[cnt]
             thestate += coeff[cnt] * self.states[cnt]
-        RMSerror = np.linalg.norm(theerror)
-        #print "DIIS coefficients = ",coeff,"and the remaining estimated error norm =",RMSerror
+        print "   DIIS :: Solve : Coefficients (latest first) = ",coeff[::-1]
         return thestate
+        

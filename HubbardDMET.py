@@ -25,6 +25,7 @@ import DMETorbitals
 import SolveCorrelatedProblem
 import SolveCorrelatedResponse
 import MinimizeCostFunction
+import DIIS
 import numpy as np
 
 class HubbardDMET:
@@ -100,9 +101,9 @@ class HubbardDMET:
         print "DMET :: Convergence reached. Converged u-matrix:"
         print umat_new
         print "***************************************************"
-        return EnergyPerSiteCorr
+        return ( EnergyPerSiteCorr , umat_new )
         
-    def SolveResponse( self, Nelectrons, orbital_i, omega, eta, numBathOrbs, toSolve, prefactResponseRDM=0.5 ):
+    def SolveResponse( self, umat_guess, Nelectrons, orbital_i, omega, eta, numBathOrbs, toSolve, prefactResponseRDM=0.5 ):
         
         numImpOrbs  = np.sum( self.impurityOrbs )
         assert( numBathOrbs >= numImpOrbs )
@@ -111,15 +112,15 @@ class HubbardDMET:
         assert( (toSolve=='A') or (toSolve=='R') or (toSolve=='F') or (toSolve=='B') ) # LDOS addition/removal or LDDR forward/backward
         assert( (prefactResponseRDM>=0.0) and (prefactResponseRDM<=1.0) )
 
-        # Start with a diagonal embedding potential
-        u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
-        print "DMET :: Starting guess for umat =",u_startguess,"* I"
-        umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
+        umat_new = np.array( umat_guess, copy=True )
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
+        maxiter    = 1
         iteration  = 0
+        #theDIIS    = DIIS.DIIS(8)
+        #usingDIIS  = False
 
-        while ( normOfDiff >= threshold ):
+        while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
@@ -133,17 +134,22 @@ class HubbardDMET:
             if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
                 print "ERROR: The single particle gap is zero!"
                 assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
+            if (toSolve=='A') or (toSolve=='R'):
+                # In case of the retarded Green's function, add the chemical potential
+                omegabis = omega + 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] )
+            else:
+                omegabis = omega
 
             # Get the RHF ground state 1RDM and the mean-fieldish response 1RDM
             groundstate1RDM  = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
             if (toSolve=='A'):
-                response1RDM = DMETorbitals.Construct1RDM_addition( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+                response1RDM = DMETorbitals.Construct1RDM_addition( orbital_i, omegabis, eta, energiesRHF, solutionRHF, numPairs )
             if (toSolve=='R'):
-                response1RDM = DMETorbitals.Construct1RDM_removal(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+                response1RDM = DMETorbitals.Construct1RDM_removal(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, numPairs )
             if (toSolve=='F'):
-                response1RDM = DMETorbitals.Construct1RDM_forward(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+                response1RDM = DMETorbitals.Construct1RDM_forward(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, numPairs )
             if (toSolve=='B'):
-                response1RDM = DMETorbitals.Construct1RDM_backward( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+                response1RDM = DMETorbitals.Construct1RDM_backward( orbital_i, omegabis, eta, energiesRHF, solutionRHF, numPairs )
 
             # The response1RDM was calculated based on a normalized wavefunction: make a linco and construct the bath orbitals
             weighted1RDM = (1.0 - prefactResponseRDM) * groundstate1RDM + prefactResponseRDM * response1RDM
@@ -154,10 +160,21 @@ class HubbardDMET:
 
             # Construct the DMET Hamiltonian and get the exact solution
             HamDMET = DMETham.DMETham(self.Ham, HamAugment, dmetOrbs, self.impurityOrbs, numImpOrbs, numBathOrbs)
-            GSenergyPerSite, GFvalue, GS_1RDM, RESP_1RDM = SolveCorrelatedResponse.Solve( HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve )
+            GSenergyPerSite, GFvalue, GS_1RDM, RESP_1RDM = SolveCorrelatedResponse.Solve( HamDMET, NelecActiveSpace, orbital_i, omegabis, eta, toSolve )
 
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve, prefactResponseRDM )
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omegabis, eta, toSolve, 0.0 )
+            umat_new = 0.4 * umat_new + 0.6 * umat_old # Relaxation factor (kills settling in a limit cycle)
             normOfDiff = np.linalg.norm( umat_new - umat_old )
+            
+            #if ( normOfDiff < 1e-3 ):
+            #    usingDIIS = True
+            #if ( usingDIIS ):
+            #    errorGS, errorRESP = MinimizeCostFunction.RESP_1RDM_differences( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace/2, orbital_i, omegabis, eta, toSolve )
+            #    totalerror = np.column_stack((errorGS, errorRESP))
+            #    totalerror = np.reshape( totalerror, totalerror.shape[0] * totalerror.shape[1] )
+            #    theDIIS.append( totalerror, umat_new )
+            #    umat_new = theDIIS.Solve()
+            
             print "   DMET :: The energy per site (correlated problem) =",GSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",GFvalue
             print "   DMET :: The 2-norm of u_new - u_old =",normOfDiff

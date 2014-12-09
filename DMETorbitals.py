@@ -18,6 +18,7 @@
 '''
 
 import numpy as np
+import math as m
     
 def Construct1RDM_groundstate( solutionRHF, numPairs ):
 
@@ -52,6 +53,13 @@ def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs
 
     removal1RDM = Construct1RDM_groundstate( solutionRHF, numPairs ) - Matrix / Overlap # Minus sign!
     return removal1RDM
+    
+def ConstructMeanFieldLDOS( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
+
+    # GF = 2 * \sum_{alpha all} C_{i,alpha} C^+_{alpha,i} / ( omega - epsilon_alpha + I*eta)
+    GreenFunction = 2.0 * np.sum( np.multiply( 1.0 / ( omega - eigsRHF[ : ] + 1j*eta ) , np.square( solutionRHF[ orbital_i, : ] ) ) )
+    LDOS = - GreenFunction.imag / m.pi
+    return LDOS
     
 def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, numPairs ):
 

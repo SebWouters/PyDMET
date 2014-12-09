@@ -18,29 +18,32 @@
 '''
 
 import numpy as np
-import math
-import HubbardDMET
+import HamInterface
+import LinalgWrappers
+import DMETorbitals
 
-def CalculateLDOS( HubbardU, Omegas, eta ):
+def CalculateLDOS( Omegas, eta ):
 
     LDOS = []
 
     lattice_size = np.array( [48, 96], dtype=int )
-    cluster_size = np.array( [ 2,  2], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
-    numBathOrbs  = 6 # Two more than the number of impurity orbitals = np.prod( cluster_size )
     orbital_i    = 0 # Take upper left corner of the impurity to kick out an electron (counting within "cluster_size" as in contiguous fortran array)
-    
-    theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
-    GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
-    
+
+    Ham = HamInterface.HamInterface(lattice_size, 0.0, antiPeriodic)
+    energiesRHF, solutionRHF = LinalgWrappers.SortedEigSymmetric( Ham.Tmat )
+    assert( Nelectrons % 2 == 0 )
+    numPairs = Nelectrons / 2
+    if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
+        print "ERROR: The single particle gap is zero!"
+        assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
+
     for omega in Omegas:
 
-        EperSite_addition, GF_addition = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'A' )
-        EperSite_remocal,  GF_removal  = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'R' )
-        SpectralFunction = - 2.0 * ( GF_addition.imag + GF_removal.imag ) / math.pi # Factor of 2 due to summation over spin projection
-        LDOS.append( SpectralFunction )
-    
+        omegabis = omega + 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] ) # Add the chemical potential to omega!
+        thisLDOS = DMETorbitals.ConstructMeanFieldLDOS( orbital_i, omegabis, eta, energiesRHF, solutionRHF, numPairs )
+        LDOS.append( thisLDOS )
+
     return LDOS
-    
+

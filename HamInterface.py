@@ -36,7 +36,7 @@ class HamInterface:
         self.NumOrbs = np.prod( self.size )
         self.Hubbard = True
         self.antiPer = antiPeriodic # Antiperiodic boundary conditions in 1D and 2D in PRL 109, 186404 (2012)
-        self.Tmat    = self.buildTmat()
+        self.Tmat    = self.buildTmat2()
 
     def getNumOrbitals( self ):
         return self.NumOrbs
@@ -73,33 +73,38 @@ class HamInterface:
             factor *= self.size[ cnt ]
         return linco
         
-    def getTmatFunction( self, i, j ):
-        difference = np.absolute( self.getLatticeCoordinate( i ) - self.getLatticeCoordinate( j ) )
-        numDiffer  = 0
-        lastDiffer = -1
-        for cnt in range(0, self.dim):
-            if ( difference[ cnt ] == 1 ) or ( difference[ cnt ] == self.size[ cnt ] - 1 ):
-                lastDiffer = cnt
-                numDiffer += 1
-            if ( difference[ cnt ] > 1 ) and ( difference[ cnt ] < self.size[ cnt ] - 1 ):
-                return 0.0
-        if ( numDiffer != 1 ):
-            return 0.0
-        else:
-            if ( difference[ lastDiffer ] == 1 ):
-                return -1.0
-            else:
-                if ( self.antiPer ):
-                    return 1.0
-                else:
-                    return -1.0
-    
-    def buildTmat( self ):
+    def buildTmat2( self ):
         Tmat = np.zeros([ self.NumOrbs , self.NumOrbs ], dtype=float)
         for i in range(0, self.NumOrbs):
-            for j in range(i+1, self.NumOrbs):
-                Tmat[i, j] = self.getTmatFunction( i , j )
-                Tmat[j, i] = Tmat[i, j]
+            co_i = self.getLatticeCoordinate( i )
+            co_j = np.array( co_i, copy=True )
+            for dimension in range(0, self.dim):
+                # First consider the neighbour at one less
+                if ( co_i[ dimension ] == 0 ):
+                    co_j[ dimension ] = self.size[ dimension ] - 1
+                    j = self.getLinearCoordinate( co_j )
+                    if ( self.antiPer ):
+                        Tmat[i, j] =  1.0
+                    else:
+                        Tmat[i, j] = -1.0
+                else:
+                    co_j[ dimension ] = co_i[ dimension ] - 1
+                    j = self.getLinearCoordinate( co_j )
+                    Tmat[i, j] = -1.0
+                co_j[ dimension ] = co_i[ dimension ] # Restore the original copy
+                # Then consider the neighbour at one more
+                if ( co_i[ dimension ] == self.size[ dimension ] - 1 ):
+                    co_j[ dimension ] = 0
+                    j = self.getLinearCoordinate( co_j )
+                    if ( self.antiPer ):
+                        Tmat[i, j] =  1.0
+                    else:
+                        Tmat[i, j] = -1.0
+                else:
+                    co_j[ dimension ] = co_i[ dimension ] + 1
+                    j = self.getLinearCoordinate( co_j )
+                    Tmat[i, j] = -1.0
+                co_j[ dimension ] = co_i[ dimension ] # Restore the original copy
         return Tmat
         
     def printer( self ):
