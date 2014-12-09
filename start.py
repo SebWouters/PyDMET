@@ -23,11 +23,11 @@ import LDOS2D
 import MeanfieldLDOS2D
 import LDDR2D
 
-case2run = 3
+case2run = 1
 
 if ( case2run == 1 ):
 
-    HubbardU = 4.0
+    HubbardU = 8.0
     Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
 
     print "Hubbard U =",HubbardU
@@ -49,7 +49,7 @@ if ( case2run == 3 ):
 
     HubbardU = 4.0
     Omegas   = np.arange(0.0, 7.05, 0.1)
-    eta      = 0.05
+    eta      = 0.2
     # Local density density response spectral function
     LDDR = LDDR2D.CalculateLDDR( HubbardU, Omegas, eta )
     print np.column_stack((Omegas, LDDR))

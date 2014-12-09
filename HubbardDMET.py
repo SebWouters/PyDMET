@@ -66,11 +66,14 @@ class HubbardDMET:
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
         iteration  = 0
+        theDIIS    = DIIS.DIIS(7)
 
         while ( normOfDiff >= threshold ): 
 
             iteration += 1
             print "*** DMET iteration",iteration,"***"
+            if ( numImpOrbs > 1 ) and ( iteration > 4 ):
+                umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
@@ -95,6 +98,12 @@ class HubbardDMET:
 
             umat_new = MinimizeCostFunction.Minimize( umat_new, OneRDMcorr, HamDMET, NelecActiveSpace )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
+            
+            if ( numImpOrbs > 1 ) and ( iteration >= 4 ):
+                error = umat_new - umat_old
+                error = np.reshape( error, error.shape[0]*error.shape[1] )
+                theDIIS.append( error, umat_new )
+            
             print "   DMET :: The energy per site (correlated problem) =",EnergyPerSiteCorr
             print "   DMET :: The 2-norm of u_new - u_old =",normOfDiff
         
