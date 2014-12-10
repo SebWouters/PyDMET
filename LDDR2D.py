@@ -25,7 +25,7 @@ def CalculateLDDR( HubbardU, Omegas, eta ):
 
     LDDR = []
 
-    lattice_size = np.array( [24, 48], dtype=int )
+    lattice_size = np.array( [48, 96], dtype=int )
     cluster_size = np.array( [ 2,  2], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True

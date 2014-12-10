@@ -23,7 +23,7 @@ import LDOS2D
 import MeanfieldLDOS2D
 import LDDR2D
 
-case2run = 1
+case2run = 2
 
 if ( case2run == 1 ):
 
@@ -37,9 +37,9 @@ if ( case2run == 1 ):
 if ( case2run == 2 ):
 
     HubbardU = 4.0
-    Omegas   = np.arange(-3.5, 3.55, 0.1)
+    Omegas   = np.arange(-3.5, 3.501, 0.02)
     eta      = 0.2
-    # Local density of states spectral function
+    #Local density of states spectral function
     LDOS = LDOS2D.CalculateLDOS( HubbardU, Omegas, eta )
     print np.column_stack((Omegas, LDOS))
     #LDOSmeanfield = MeanfieldLDOS2D.CalculateLDOS( Omegas, eta )
@@ -48,7 +48,7 @@ if ( case2run == 2 ):
 if ( case2run == 3 ):
 
     HubbardU = 4.0
-    Omegas   = np.arange(0.0, 7.05, 0.1)
+    Omegas   = np.arange(0.0, 7.001, 0.02)
     eta      = 0.2
     # Local density density response spectral function
     LDDR = LDDR2D.CalculateLDDR( HubbardU, Omegas, eta )
