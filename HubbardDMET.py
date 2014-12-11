@@ -124,15 +124,16 @@ class HubbardDMET:
         umat_new = np.array( umat_guess, copy=True )
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
-        maxiter    = 1
+        maxiter    = 100000
         iteration  = 0
-        #theDIIS    = DIIS.DIIS(8)
-        #usingDIIS  = False
+        theDIIS    = DIIS.DIIS(7)
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
+            if ( numImpOrbs > 1 ) and ( iteration > 1 ):
+                umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
@@ -171,18 +172,13 @@ class HubbardDMET:
             HamDMET = DMETham.DMETham(self.Ham, HamAugment, dmetOrbs, self.impurityOrbs, numImpOrbs, numBathOrbs)
             GSenergyPerSite, GFvalue, GS_1RDM, RESP_1RDM = SolveCorrelatedResponse.Solve( HamDMET, NelecActiveSpace, orbital_i, omegabis, eta, toSolve )
 
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omegabis, eta, toSolve, 0.0 )
-            umat_new = 0.4 * umat_new + 0.6 * umat_old # Relaxation factor (kills settling in a limit cycle)
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omegabis, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            #if ( normOfDiff < 1e-3 ):
-            #    usingDIIS = True
-            #if ( usingDIIS ):
-            #    errorGS, errorRESP = MinimizeCostFunction.RESP_1RDM_differences( umat_new, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace/2, orbital_i, omegabis, eta, toSolve )
-            #    totalerror = np.column_stack((errorGS, errorRESP))
-            #    totalerror = np.reshape( totalerror, totalerror.shape[0] * totalerror.shape[1] )
-            #    theDIIS.append( totalerror, umat_new )
-            #    umat_new = theDIIS.Solve()
+            if ( numImpOrbs > 1 ) and ( iteration >= 1 ):
+                error = umat_new - umat_old
+                error = np.reshape( error, error.shape[0]*error.shape[1] )
+                theDIIS.append( error, umat_new )
             
             print "   DMET :: The energy per site (correlated problem) =",GSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",GFvalue

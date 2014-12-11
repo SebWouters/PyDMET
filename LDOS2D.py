@@ -41,6 +41,7 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
         EperSite_remocal,  GF_removal  = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'R' )
         SpectralFunction = - 2.0 * ( GF_addition.imag + GF_removal.imag ) / math.pi # Factor of 2 due to summation over spin projection
         LDOS.append( SpectralFunction )
+        print "LDOS( U =",HubbardU,"; omega =",omega,") =",SpectralFunction
     
     return LDOS
     

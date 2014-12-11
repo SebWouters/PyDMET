@@ -41,6 +41,7 @@ def CalculateLDDR( HubbardU, Omegas, eta ):
         EperSite_backward, GF_backward  = theDMET.SolveResponse( umatrix, Nelectrons, orbital_i, omega, eta, numBathOrbs, 'B' )
         SpectralFunction = - ( GF_forward.imag - GF_backward.imag ) / math.pi
         LDDR.append( SpectralFunction )
+        print "LDDR( U =",HubbardU,"; omega =",omega,") =",SpectralFunction
     
     return LDDR
     
