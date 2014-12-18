@@ -25,14 +25,13 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
 
     LDOS = []
 
-    lattice_size = np.array( [48, 96], dtype=int )
-    cluster_size = np.array( [ 2,  2], dtype=int )
+    lattice_size = np.array( [ 960 ], dtype=int )
+    cluster_size = np.array( [   4 ], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
-    skew2by2cell = True
     numBathOrbs  = 6 # Two more than the number of impurity orbitals = np.prod( cluster_size )
-    
-    theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic, skew2by2cell )
+
+    theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
     GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
     
     for omega in Omegas:
@@ -42,6 +41,6 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
         SpectralFunction = - 2.0 * ( GF_addition.imag + GF_removal.imag ) / math.pi # Factor of 2 due to summation over spin projection
         LDOS.append( SpectralFunction )
         print "LDOS( U =",HubbardU,"; omega =",omega,") =",SpectralFunction
-    
+
     return LDOS
     

@@ -27,3 +27,14 @@ def SortedEigSymmetric( Mat ):
     eigenvecs = eigenvecs[:,idx]
     return ( eigenvals, eigenvecs )
 
+def RestrictedHartreeFock( OEI, numPairs, printSPgap=False ):
+    
+    energiesRHF, solutionRHF = SortedEigSymmetric( OEI )
+    SPgap = energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ]
+    if ( printSPgap ):
+        print "   RHF :: HOMO-LUMO gap =",SPgap
+    if ( SPgap < 1e-8 ):
+        print "ERROR: The single particle gap is zero!"
+    assert( SPgap >= 1e-8 )
+    return ( energiesRHF, solutionRHF )
+    

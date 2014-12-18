@@ -26,26 +26,25 @@ def UmatFlat2Square( umatflat, lindim ):
 
     umatsquare = np.zeros( [ lindim, lindim ], dtype=float )
     for row in range(0, lindim):
-        for col in range(row, lindim):
-            umatsquare[row, col] = umatflat[ row + ( col * ( col + 1 ) ) / 2 ]
+        umatsquare[row, row] = umatflat[0] # All diagonal elements are forced to be the same
+        for col in range(row+1, lindim):
+            umatsquare[row, col] = umatflat[ 1 + row + ( col * ( col - 1 ) ) / 2 ]
             umatsquare[col, row] = umatsquare[row, col]
     return umatsquare
             
 def UmatSquare2Flat( umatsquare, lindim ):
 
-    umatflat = np.zeros( [ ( lindim * ( lindim + 1 ) ) / 2 ], dtype=float )
+    umatflat = np.zeros( [ 1 + ( lindim * ( lindim - 1 ) ) / 2 ], dtype=float )
+    umatflat[0] = umatsquare[0, 0] # All diagonal elements are forced to be the same
     for row in range(0, lindim):
-        for col in range(row, lindim):
-            umatflat[ row + ( col * ( col + 1 ) ) / 2 ] = umatsquare[row, col]
+        for col in range(row+1, lindim):
+            umatflat[ 1 + row + ( col * ( col - 1 ) ) / 2 ] = umatsquare[row, col]
     return umatflat
 
 def GS_1RDMdifference( umatsquare, GS_1RDM, HamDMET, numPairs ):
 
     HamDMET.OverwriteImpurityUmat( umatsquare )
-    energiesRHF, solutionRHF = LinalgWrappers.SortedEigSymmetric( HamDMET.Tmat )
-    if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
-        print "ERROR: The single particle gap is zero!"
-        assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
+    energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamDMET.Tmat, numPairs )
     
     GS_1RDM_Slater = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
     errorGS = GS_1RDM - GS_1RDM_Slater
@@ -72,48 +71,49 @@ def Minimize( umat_guess, GS_1RDM, HamDMET, NelecActiveSpace ):
     umatsquare = UmatFlat2Square( result.x, HamDMET.numImpOrbs )
     return umatsquare
     
-def RESP_1RDM_differences( umatsquare, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve ):
+def RESP_1RDM_differences( umatsquare, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve ):
 
-    HamDMET.OverwriteImpurityUmat( umatsquare )
-    energiesRHF, solutionRHF = LinalgWrappers.SortedEigSymmetric( HamDMET.Tmat )
-    if ( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] < 1e-8 ):
-        print "ERROR: The single particle gap is zero!"
-        assert( energiesRHF[ numPairs ] - energiesRHF[ numPairs-1 ] >= 1e-8 )
-
-    GS_1RDM_Slater = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
-    if (toSolve=='A'):
-        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_addition( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
-    if (toSolve=='R'):
-        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_removal(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
-    if (toSolve=='F'):
-        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_forward(  orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
-    if (toSolve=='B'):
-        RESP_1RDM_Slater = DMETorbitals.Construct1RDM_backward( orbital_i, omega, eta, energiesRHF, solutionRHF, numPairs )
+    errorsGS   = []
+    errorsRESP = []
+    for orbital_i in range(0, HamDMETs[0].numImpOrbs):
+        HamDMETs[ orbital_i ].OverwriteImpurityUmat( umatsquare )
+        energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamDMETs[ orbital_i ].Tmat, numPairs )
+        GS_1RDM_Slater = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
+        errorsGS.append( GS_1RDMs[ orbital_i ] - GS_1RDM_Slater )
+        if (toSolve=='A'):
+            RESP_1RDM_Slater = DMETorbitals.Construct1RDM_addition( orbital_i, omega, eta, energiesRHF, solutionRHF, GS_1RDM_Slater, numPairs )
+        if (toSolve=='R'):
+            RESP_1RDM_Slater = DMETorbitals.Construct1RDM_removal(  orbital_i, omega, eta, energiesRHF, solutionRHF, GS_1RDM_Slater, numPairs )
+        if (toSolve=='F'):
+            RESP_1RDM_Slater = DMETorbitals.Construct1RDM_forward(  orbital_i, omega, eta, energiesRHF, solutionRHF, GS_1RDM_Slater, numPairs )
+        if (toSolve=='B'):
+            RESP_1RDM_Slater = DMETorbitals.Construct1RDM_backward( orbital_i, omega, eta, energiesRHF, solutionRHF, GS_1RDM_Slater, numPairs )
+        errorsRESP.append( RESP_1RDMs[ orbital_i ] - RESP_1RDM_Slater )
+    return ( errorsGS, errorsRESP )
     
-    errorGS   = GS_1RDM   - GS_1RDM_Slater
-    errorRESP = RESP_1RDM - RESP_1RDM_Slater
-    assert( abs( np.trace(errorGS  ) ) < 1e-8 ) # If not OK, the particle number is wrong in one of the two 1-RDMs
-    assert( abs( np.trace(errorRESP) ) < 1e-8 ) # If not OK, the particle number is wrong in one of the two 1-RDMs
-    return ( errorGS, errorRESP )
-    
-def CostFunctionResponse( umatflat, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve, prefactResponseRDM ):
+def CostFunctionResponse( umatflat, umatflat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM ):
 
-    umatsquare = UmatFlat2Square( umatflat, HamDMET.numImpOrbs )
-    errorGS, errorRESP = RESP_1RDM_differences( umatsquare, GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve )
-    return ( 1.0 - prefactResponseRDM ) * np.linalg.norm( errorGS )**2 + prefactResponseRDM * np.linalg.norm( errorRESP )**2
+    umatsquare = UmatFlat2Square( umatflat, HamDMETs[0].numImpOrbs )
+    errorsGS, errorsRESP = RESP_1RDM_differences( umatsquare, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve )
+    totalError = 0.0
+    for orbital_i in range(0, HamDMETs[0].numImpOrbs):
+        totalError += (1.0 - prefactResponseRDM) * np.linalg.norm( errorsGS[ orbital_i ] )**2 + prefactResponseRDM * np.linalg.norm( errorsRESP[ orbital_i ] )**2
+    totalError += 0.1 * np.linalg.norm( umatflat - umatflat_old )**2
+    return totalError
     
-def MinimizeResponse( umat_guess, GS_1RDM, RESP_1RDM, HamDMET, NelecActiveSpace, orbital_i, omega, eta, toSolve, prefactResponseRDM ):
+def MinimizeResponse( umat_guess, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omega, eta, toSolve, prefactResponseRDM ):
 
-    umatflat = UmatSquare2Flat( umat_guess, HamDMET.numImpOrbs )
+    umatflat     = UmatSquare2Flat( umat_guess, HamDMETs[0].numImpOrbs )
+    umatflat_old = UmatSquare2Flat( umat_old,   HamDMETs[0].numImpOrbs )
 
     assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
-    result = minimize( CostFunctionResponse, umatflat, args=(GS_1RDM, RESP_1RDM, HamDMET, numPairs, orbital_i, omega, eta, toSolve, prefactResponseRDM), options={'disp': False} )
+    result = minimize( CostFunctionResponse, umatflat, args=(umatflat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM), options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message
     print "   Minimize :: Cost function after convergence =",result.fun
 
-    umatsquare = UmatFlat2Square( result.x, HamDMET.numImpOrbs )
+    umatsquare = UmatFlat2Square( result.x, HamDMETs[0].numImpOrbs )
     return umatsquare
     
     

@@ -35,12 +35,14 @@ def CalculateEnergies( HubbardU ):
             lattice_size = np.array( [24, 48], dtype=int )
             if ( clustercounter==0 ):
                 cluster_size = np.array( [1, 1], dtype=int )
+                skew2by2cell = False
             else:
                 cluster_size = np.array( [2, 2], dtype=int )
+                skew2by2cell = False
             Nelectrons   = ( np.prod( lattice_size ) * electroncounter ) / 24
             antiPeriodic = True
 
-            theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
+            theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic, skew2by2cell )
             EnergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
 
             if ( clustercounter==0 ):

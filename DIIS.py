@@ -50,6 +50,6 @@ class DIIS:
         thestate = coeff[0] * self.states[0]
         for cnt in range(1, len(coeff)):
             thestate += coeff[cnt] * self.states[cnt]
-        print "   DIIS :: Solve : Coefficients (latest first) = ",coeff[::-1]
+        print "   DIIS :: Coefficients (latest first) = ",coeff[::-1]
         return thestate
         
