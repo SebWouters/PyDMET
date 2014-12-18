@@ -137,12 +137,14 @@ class HubbardDMET:
         maxiter    = 1000
         iteration  = 0
         theDIIS    = DIIS.DIIS(7)
+        startedDIIS= False
+        threshDIIS = 1e-2
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
-            if ( numImpOrbs > 1 ) and ( iteration > 4 ):
+            if ( numImpOrbs > 1 ) and ( ( normOfDiff < threshDIIS ) or ( startedDIIS==True ) ):
                 umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
@@ -200,11 +202,14 @@ class HubbardDMET:
                 GS_1RDMs.append( GS_1RDM )
                 RESP_1RDMs.append( RESP_1RDM )
             averageGSenergyPerSite = ( 1.0 * averageGSenergyPerSite ) / numImpOrbs
+            if ( iteration==1 ):
+                notSelfConsistentTotalGF = totalGFvalue
 
             umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            if ( numImpOrbs > 1 ) and ( iteration >= 4 ):
+            if ( numImpOrbs > 1 ) and ( ( normOfDiff < threshDIIS ) or ( startedDIIS==True ) ):
+                startedDIIS = True
                 error = umat_new - umat_old
                 error = np.reshape( error, error.shape[0]*error.shape[1] )
                 theDIIS.append( error, umat_new )
@@ -217,6 +222,6 @@ class HubbardDMET:
         print "DMET :: Convergence reached. Converged u-matrix:"
         print umat_new
         print "***************************************************"
-        return ( GSenergyPerSite , totalGFvalue )
+        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
         
         

@@ -36,11 +36,12 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
     
     for omega in Omegas:
 
-        EperSite_addition, GF_addition = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'A' )
-        EperSite_remocal,  GF_removal  = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'R' )
-        SpectralFunction = - 2.0 * ( GF_addition.imag + GF_removal.imag ) / math.pi # Factor of 2 due to summation over spin projection
+        EperSite_add, GF_add, notSC_GF_add = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'A' )
+        EperSite_rem, GF_rem, notSC_GF_rem = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'R' )
+        SpectralFunction = - 2.0 * ( GF_add.imag + GF_rem.imag ) / math.pi # Factor of 2 due to summation over spin projection
         LDOS.append( SpectralFunction )
-        print "LDOS( U =",HubbardU,"; omega =",omega,") =",SpectralFunction
+        print "LDOS( U =",HubbardU,"; omega =",omega,") NOT self-consistent =",2 * ( - notSC_GF_add.imag - notSC_GF_rem.imag ) / math.pi
+        print "LDOS( U =",HubbardU,"; omega =",omega,")     self-consistent =",SpectralFunction
 
     return LDOS
     
