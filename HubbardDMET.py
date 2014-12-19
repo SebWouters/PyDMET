@@ -132,13 +132,16 @@ class HubbardDMET:
         
         # Set up a few parameters for the self-consistent response DMET
         umat_new   = np.array( umat_guess, copy=True )
+        #u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
+        #print "DMET :: Starting guess for umat =",u_startguess,"* I"
+        #umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
         maxiter    = 1000
         iteration  = 0
         theDIIS    = DIIS.DIIS(7)
         startedDIIS= False
-        threshDIIS = 1e-1
+        threshDIIS = 1e-2
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
@@ -208,7 +211,7 @@ class HubbardDMET:
             umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            if ( numImpOrbs > 1 ) and ( ( iteration >= 5 ) or ( normOfDiff < threshDIIS ) or ( startedDIIS==True ) ):
+            if ( numImpOrbs > 1 ) and ( ( normOfDiff < threshDIIS ) or ( startedDIIS==True ) ):
                 startedDIIS = True
                 error = umat_new - umat_old
                 error = np.reshape( error, error.shape[0]*error.shape[1] )
