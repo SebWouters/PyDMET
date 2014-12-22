@@ -21,11 +21,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 Building and testing
 --------------------
 
-PyDMET requires python, scipy, and libchemps2. libchemps2 can be downloaded
-from [github](https://github.com/SebWouters/CheMPS2). Follow the installation
-instructions on that page. Once PyCheMPS2 is built, the path can be adjusted
-in SolveCorrelatedProblem.py and SolveCorrelatedResponse.py.
+PyDMET requires python, scipy, and
+[libchemps2](https://github.com/SebWouters/CheMPS2). The path to PyCheMPS2
+can be adjusted in SolveCorrelated.py.
 
-Start from start.py; GroundState2D.py; LDOS2D.py; LDDR2D.py and adjust these
-files to start using PyDMET.
+Start from start.py; GroundState2D.py; LDOS2D.py; LDOS1D.py; LDDR2D.py and
+adjust these files to start using PyDMET.
 

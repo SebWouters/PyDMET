@@ -27,7 +27,7 @@ case2run = 4
 
 if ( case2run == 1 ):
 
-    HubbardU = 8.0
+    HubbardU = 4.0
     Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
 
     print "Hubbard U =",HubbardU
@@ -58,7 +58,7 @@ if ( case2run == 3 ):
 if ( case2run == 4 ):
 
     HubbardU = 8.0
-    Omegas   = np.array([ 1.23456 ])
+    Omegas   = np.array([ -4.0 ])
     eta      = 0.05
     #Local density of states spectral function
     LDOS = LDOS1D.CalculateLDOS( HubbardU, Omegas, eta )

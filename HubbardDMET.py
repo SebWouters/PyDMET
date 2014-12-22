@@ -22,8 +22,7 @@ import HamFull
 import DMETham
 import LinalgWrappers
 import DMETorbitals
-import SolveCorrelatedProblem
-import SolveCorrelatedResponse
+import SolveCorrelated
 import MinimizeCostFunction
 import DIIS
 import numpy as np
@@ -102,7 +101,7 @@ class HubbardDMET:
 
             # Construct the DMET Hamiltonian and get the exact solution
             HamDMET = DMETham.DMETham(self.Ham, HamAugment, dmetOrbs, self.impurityOrbs, numImpOrbs, numBathOrbs)
-            EnergyPerSiteCorr, OneRDMcorr = SolveCorrelatedProblem.Solve( HamDMET, NelecActiveSpace )
+            EnergyPerSiteCorr, OneRDMcorr, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMET, NelecActiveSpace )
 
             umat_new = MinimizeCostFunction.Minimize( umat_new, OneRDMcorr, HamDMET, NelecActiveSpace )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
@@ -198,8 +197,8 @@ class HubbardDMET:
             GS_1RDMs   = []
             RESP_1RDMs = []
             for orbital_i in range(0, numImpOrbs):
-                GSenergyPerSite, GS_1RDM, GSenergyFCI, GSvectorFCI = SolveCorrelatedResponse.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
-                GFvalue, RESP_1RDM = SolveCorrelatedResponse.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSenergyFCI, GSvectorFCI )
+                GSenergyPerSite, GS_1RDM, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
+                GFvalue, RESP_1RDM = SolveCorrelated.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSenergyFCI, GSvectorFCI )
                 totalGFvalue += GFvalue
                 averageGSenergyPerSite += GSenergyPerSite
                 GS_1RDMs.append( GS_1RDM )

@@ -39,9 +39,10 @@ def CalculateLDDR( HubbardU, Omegas, eta ):
 
         EperSite_FW, GF_FW, notSC_GF_FW = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'F' )
         EperSite_BW, GF_BW, notSC_GF_BW = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'B' )
-        SpectralFunction = - ( GF_FW.imag - GF_BW.imag ) / math.pi
+        SpectralFunction       = - ( GF_FW.imag - GF_BW.imag ) / math.pi
+        SpectralFunction_notSC = - ( notSC_GF_FW.imag - notSC_GF_BW.imag ) / math.pi
         LDDR.append( SpectralFunction )
-        print "LDDR( U =",HubbardU,"; omega =",omega,") NOT self-consistent =",( - notSC_GF_FW.imag + notSC_GF_BW.imag ) / math.pi
+        print "LDDR( U =",HubbardU,"; omega =",omega,") NOT self-consistent =",SpectralFunction_notSC
         print "LDDR( U =",HubbardU,"; omega =",omega,")     self-consistent =",SpectralFunction
     
     return LDDR
