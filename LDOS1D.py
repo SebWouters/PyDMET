@@ -1,6 +1,6 @@
 '''
     PyDMET: a python implementation of density matrix embedding theory
-    Copyright (C) 2014 Sebastian Wouters
+    Copyright (C) 2014, 2015 Sebastian Wouters
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 
 import numpy as np
 import math
+import sys
+sys.path.append('src')
 import HubbardDMET
 
 def CalculateLDOS( HubbardU, Omegas, eta ):

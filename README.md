@@ -1,7 +1,7 @@
 PyDMET: a python implementation of density matrix embedding theory
 ==================================================================
 
-Copyright (C) 2014 Sebastian Wouters <sebastianwouters@gmail.com>
+Copyright (C) 2014, 2015 Sebastian Wouters <sebastianwouters@gmail.com>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

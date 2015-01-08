@@ -1,6 +1,6 @@
 '''
     PyDMET: a python implementation of density matrix embedding theory
-    Copyright (C) 2014 Sebastian Wouters
+    Copyright (C) 2014, 2015 Sebastian Wouters
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -64,24 +64,21 @@ class HubbardDMET:
         impurityOrbs = np.reshape( impurityOrbs, ( np.prod( self.lattice_size ) ), order='F' ) # HamFull assumes fortran
         return impurityOrbs
                 
-    def SolveGroundState( self, Nelectrons ):
+    def SolveGroundState( self, Nelectrons, umat_guess=None ):
     
         numImpOrbs  = np.sum( self.impurityOrbs )
         numBathOrbs = numImpOrbs
         assert( Nelectrons % 2 == 0 )
         numPairs = Nelectrons / 2
 
-        if ( self.skew2by2cell ) and ( 2 * numPairs == np.prod(self.lattice_size) ) and ( self.HubbardU > 5.5 ) and (self.HubbardU < 14.5 ):
-            # For the special case of half-filling and 5.5 < U < 14.5 ==> coexistence region insulating and metallic PM
-            import Skew2by2umats
-            umat_new = Skew2by2umats.getU6toU14( self.HubbardU )
-            print "DMET :: Starting guess for umat ="
-            print umat_new
-        else:
+        if ( umat_guess == None ):
             # Start with a diagonal embedding potential
             u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
-            print "DMET :: Starting guess for umat =",u_startguess,"* I"
             umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
+        else:
+            umat_new = np.array( umat_guess, copy=True )
+        print "DMET :: Starting guess for umat ="
+        print umat_new
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
         iteration  = 0

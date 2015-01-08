@@ -1,6 +1,6 @@
 '''
     PyDMET: a python implementation of density matrix embedding theory
-    Copyright (C) 2014 Sebastian Wouters
+    Copyright (C) 2014, 2015 Sebastian Wouters
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,23 +18,13 @@
 '''
 
 import numpy as np
-import GroundState2D
 import LDOS2D
 import LDOS1D
 import LDDR2D
 
-case2run = 4
+case2run = 2
 
 if ( case2run == 1 ):
-
-    HubbardU = 4.0
-    Filling, Energy1, Energy4 = GroundState2D.CalculateEnergies( HubbardU )
-
-    print "Hubbard U =",HubbardU
-    print "Filling ; Energy/site for 1x1 cluster ; Energy/site for 2x2 cluster"
-    print np.column_stack((Filling, Energy1, Energy4))
-
-if ( case2run == 2 ):
 
     HubbardU = 10.0
     Omegas   = np.array([ 1.23456 ])
@@ -42,20 +32,17 @@ if ( case2run == 2 ):
     #Local density of states spectral function
     LDOS = LDOS2D.CalculateLDOS( HubbardU, Omegas, eta )
     print np.column_stack((Omegas, LDOS))
-    #import MeanfieldLDOS2D
-    #LDOSmeanfield = MeanfieldLDOS2D.CalculateLDOS( Omegas, eta )
-    #print np.column_stack((Omegas, LDOSmeanfield))
 
-if ( case2run == 3 ):
+if ( case2run == 2 ):
 
-    HubbardU = 4.0
+    HubbardU = 12.0
     Omegas   = np.array([ 1.23456 ])
     eta      = 0.2
     # Local density density response spectral function
     LDDR = LDDR2D.CalculateLDDR( HubbardU, Omegas, eta )
     print np.column_stack((Omegas, LDDR))
     
-if ( case2run == 4 ):
+if ( case2run == 3 ):
 
     HubbardU = 8.0
     Omegas   = np.array([ -4.0 ])

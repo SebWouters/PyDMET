@@ -1,6 +1,6 @@
 '''
     PyDMET: a python implementation of density matrix embedding theory
-    Copyright (C) 2014 Sebastian Wouters
+    Copyright (C) 2014, 2015 Sebastian Wouters
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,7 +19,10 @@
 
 import numpy as np
 import math
+import sys
+sys.path.append('src')
 import HubbardDMET
+import InsulatingPMguess
 
 def CalculateLDOS( HubbardU, Omegas, eta ):
 
@@ -33,7 +36,14 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
     numBathOrbs  = 6 # Two more than the number of impurity orbitals = np.prod( cluster_size )
     
     theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic, skew2by2cell )
-    GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
+    if ( HubbardU > 6.5 ):
+        if ( skew2by2cell ):
+            umat_guess = InsulatingPMguess.PullSkew2by2( HubbardU )
+        else:
+            umat_guess = InsulatingPMguess.PullSquare2by2( HubbardU )
+    else:
+        umat_guess = None
+    GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons, umat_guess )
     
     for omega in Omegas:
 
