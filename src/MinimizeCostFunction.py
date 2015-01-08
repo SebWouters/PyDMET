@@ -98,7 +98,7 @@ def CostFunctionResponse( umatflat, umatflat_old, GS_1RDMs, RESP_1RDMs, HamDMETs
     totalError = 0.0
     for orbital_i in range(0, HamDMETs[0].numImpOrbs):
         totalError += (1.0 - prefactResponseRDM) * np.linalg.norm( errorsGS[ orbital_i ] )**2 + prefactResponseRDM * np.linalg.norm( errorsRESP[ orbital_i ] )**2
-    totalError += np.linalg.norm( umatflat - umatflat_old )**2
+    totalError += 0.01 * np.linalg.norm( umatflat - umatflat_old )**2
     return totalError
     
 def MinimizeResponse( umat_guess, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omega, eta, toSolve, prefactResponseRDM ):

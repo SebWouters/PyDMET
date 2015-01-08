@@ -22,7 +22,7 @@ import LDOS2D
 import LDOS1D
 import LDDR2D
 
-case2run = 2
+case2run = 3
 
 if ( case2run == 1 ):
 
@@ -45,7 +45,7 @@ if ( case2run == 2 ):
 if ( case2run == 3 ):
 
     HubbardU = 8.0
-    Omegas   = np.array([ -4.0 ])
+    Omegas   = np.array([ 1.23456 ])
     eta      = 0.05
     #Local density of states spectral function
     LDOS = LDOS1D.CalculateLDOS( HubbardU, Omegas, eta )
