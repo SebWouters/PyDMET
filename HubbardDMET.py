@@ -143,15 +143,15 @@ class HubbardDMET:
         threshold  = 1e-6 * numImpOrbs
         maxiter    = 1000
         iteration  = 0
-        theDIIS    = DIIS.DIIS(7)
-        numNonDIIS = 16
+        #theDIIS    = DIIS.DIIS(7)
+        #numNonDIIS = 1
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
-            if ( numImpOrbs > 1 ) and ( iteration > numNonDIIS ):
-                umat_new = theDIIS.Solve()
+            #if ( numImpOrbs > 1 ) and ( iteration > numNonDIIS ):
+            #    umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
@@ -215,10 +215,10 @@ class HubbardDMET:
             umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            if ( numImpOrbs > 1 ) and ( iteration >= numNonDIIS ):
-                error = umat_new - umat_old
-                error = np.reshape( error, error.shape[0]*error.shape[1] )
-                theDIIS.append( error, umat_new )
+            #if ( numImpOrbs > 1 ) and ( iteration >= numNonDIIS ):
+            #    error = umat_new - umat_old
+            #    error = np.reshape( error, error.shape[0]*error.shape[1] )
+            #    theDIIS.append( error, umat_new )
             
             print "   DMET :: The average ground-state energy per site =",averageGSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",totalGFvalue
