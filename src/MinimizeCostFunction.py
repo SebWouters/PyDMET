@@ -91,14 +91,13 @@ def RESP_1RDM_differences( umatsquare, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs,
         errorsRESP.append( RESP_1RDMs[ orbital_i ] - RESP_1RDM_Slater )
     return ( errorsGS, errorsRESP )
     
-def CostFunctionResponse( umatflat, umatflat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM ):
+def CostFunctionResponse( umatflat, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM ):
 
     umatsquare = UmatFlat2Square( umatflat, HamDMETs[0].numImpOrbs )
     errorsGS, errorsRESP = RESP_1RDM_differences( umatsquare, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve )
     totalError = 0.0
     for orbital_i in range(0, HamDMETs[0].numImpOrbs):
         totalError += (1.0 - prefactResponseRDM) * np.linalg.norm( errorsGS[ orbital_i ] )**2 + prefactResponseRDM * np.linalg.norm( errorsRESP[ orbital_i ] )**2
-    totalError += 0.01 * np.linalg.norm( umatflat - umatflat_old )**2
     return totalError
     
 def MinimizeResponse( umat_guess, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omega, eta, toSolve, prefactResponseRDM ):
@@ -108,7 +107,10 @@ def MinimizeResponse( umat_guess, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, Nele
 
     assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
-    result = minimize( CostFunctionResponse, umatflat, args=(umatflat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM), options={'disp': False} )
+    boundaries = []
+    for element in umatflat_old:
+        boundaries.append( (element-0.1, element+0.1) )
+    result = minimize( CostFunctionResponse, umatflat, args=(GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message
     print "   Minimize :: Cost function after convergence =",result.fun
