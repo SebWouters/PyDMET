@@ -25,6 +25,6 @@ PyDMET requires python, scipy, and
 [libchemps2](https://github.com/SebWouters/CheMPS2). The path to PyCheMPS2
 can be adjusted in SolveCorrelated.py.
 
-Start from start.py; GroundState2D.py; LDOS2D.py; LDOS1D.py; LDDR2D.py and
+Start from start.py; LDOS2D.py; LDOS1D.py; LDDR2D.py and
 adjust these files to start using PyDMET.
 
