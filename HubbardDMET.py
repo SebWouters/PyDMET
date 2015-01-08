@@ -71,20 +71,28 @@ class HubbardDMET:
         assert( Nelectrons % 2 == 0 )
         numPairs = Nelectrons / 2
 
-        # Start with a diagonal embedding potential
-        u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
-        print "DMET :: Starting guess for umat =",u_startguess,"* I"
-        umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
+        if ( self.skew2by2cell ) and ( 2 * numPairs == np.prod(self.lattice_size) ) and ( self.HubbardU > 5.5 ) and (self.HubbardU < 14.5 ):
+            # For the special case of half-filling and 5.5 < U < 14.5 ==> coexistence region insulating and metallic PM
+            import Skew2by2umats
+            umat_new = Skew2by2umats.getU6toU14( self.HubbardU )
+            print "DMET :: Starting guess for umat ="
+            print umat_new
+        else:
+            # Start with a diagonal embedding potential
+            u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
+            print "DMET :: Starting guess for umat =",u_startguess,"* I"
+            umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
         iteration  = 0
         theDIIS    = DIIS.DIIS(7)
+        numNonDIIS = 4
 
         while ( normOfDiff >= threshold ): 
 
             iteration += 1
             print "*** DMET iteration",iteration,"***"
-            if ( numImpOrbs > 1 ) and ( iteration > 4 ):
+            if ( numImpOrbs > 1 ) and ( iteration > numNonDIIS ):
                 umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
@@ -106,7 +114,7 @@ class HubbardDMET:
             umat_new = MinimizeCostFunction.Minimize( umat_new, OneRDMcorr, HamDMET, NelecActiveSpace )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            if ( numImpOrbs > 1 ) and ( iteration >= 4 ):
+            if ( numImpOrbs > 1 ) and ( iteration >= numNonDIIS ):
                 error = umat_new - umat_old
                 error = np.reshape( error, error.shape[0]*error.shape[1] )
                 theDIIS.append( error, umat_new )
@@ -131,23 +139,19 @@ class HubbardDMET:
         
         # Set up a few parameters for the self-consistent response DMET
         umat_new   = np.array( umat_guess, copy=True )
-        #u_startguess = (1.0 * self.HubbardU * numPairs) / np.prod(self.lattice_size)
-        #print "DMET :: Starting guess for umat =",u_startguess,"* I"
-        #umat_new = u_startguess * np.identity( numImpOrbs, dtype=float )
         normOfDiff = 1.0
         threshold  = 1e-6 * numImpOrbs
         maxiter    = 1000
         iteration  = 0
         theDIIS    = DIIS.DIIS(7)
-        #startedDIIS= False
-        #threshDIIS = 1e-2
+        numNonDIIS = 16
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
-            #if ( startedDIIS==True ):
-            #    umat_new = theDIIS.Solve()
+            if ( numImpOrbs > 1 ) and ( iteration > numNonDIIS ):
+                umat_new = theDIIS.Solve()
             umat_old = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
@@ -155,12 +159,13 @@ class HubbardDMET:
 
             # Get the RHF ground-state 1-RDM
             energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamAugment.Tmat, numPairs, True )
+            if ( iteration == 1 ):
+                chemical_potential_mu = 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] )
+                if ( toSolve == 'A' ) or ( toSolve == 'R' ):
+                    omegabis = omega + chemical_potential_mu # Shift omega with the chemical potential for the retarded Green's function
+                else:
+                    omegabis = omega
             groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
-            if (toSolve=='A') or (toSolve=='R'):
-                # Shift omega with the chemical potential for the retarded Green's function
-                omegabis = omega + 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] )
-            else:
-                omegabis = omega
             
             # Get the RHF mean-field response 1-RDMs
             response1RDMs = []
@@ -210,11 +215,10 @@ class HubbardDMET:
             umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
             normOfDiff = np.linalg.norm( umat_new - umat_old )
             
-            #if ( numImpOrbs > 1 ) and ( ( iteration >= 10 ) or ( normOfDiff < threshDIIS ) or ( startedDIIS==True ) ):
-            #    startedDIIS = True
-            #    error = umat_new - umat_old
-            #    error = np.reshape( error, error.shape[0]*error.shape[1] )
-            #    theDIIS.append( error, umat_new )
+            if ( numImpOrbs > 1 ) and ( iteration >= numNonDIIS ):
+                error = umat_new - umat_old
+                error = np.reshape( error, error.shape[0]*error.shape[1] )
+                theDIIS.append( error, umat_new )
             
             print "   DMET :: The average ground-state energy per site =",averageGSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",totalGFvalue
