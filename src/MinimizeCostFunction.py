@@ -100,16 +100,15 @@ def CostFunctionResponse( umatflat, GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, om
         totalError += (1.0 - prefactResponseRDM) * np.linalg.norm( errorsGS[ orbital_i ] )**2 + prefactResponseRDM * np.linalg.norm( errorsRESP[ orbital_i ] )**2
     return totalError
     
-def MinimizeResponse( umat_guess, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omega, eta, toSolve, prefactResponseRDM ):
+def MinimizeResponse( umat_guess, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omega, eta, toSolve, prefactResponseRDM, maxdelta ):
 
-    umatflat     = UmatSquare2Flat( umat_guess, HamDMETs[0].numImpOrbs )
-    umatflat_old = UmatSquare2Flat( umat_old,   HamDMETs[0].numImpOrbs )
+    umatflat = UmatSquare2Flat( umat_guess, HamDMETs[0].numImpOrbs )
 
     assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
     boundaries = []
-    for element in umatflat_old:
-        boundaries.append( (element-0.1, element+0.1) )
+    for element in umatflat:
+        boundaries.append( ( element-maxdelta, element+maxdelta ) )
     result = minimize( CostFunctionResponse, umatflat, args=(GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message

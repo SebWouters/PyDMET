@@ -135,13 +135,17 @@ class HubbardDMET:
         assert( (prefactResponseRDM>=0.0) and (prefactResponseRDM<=1.0) )
         
         # Set up a few parameters for the self-consistent response DMET
-        umat_new   = np.array( umat_guess, copy=True )
-        normOfDiff = 1.0
-        threshold  = 1e-6 * numImpOrbs
-        maxiter    = 1000
-        iteration  = 0
-        theDIIS    = DIIS.DIIS(7)
-        startedDIIS= False
+        umat_new    = np.array( umat_guess, copy=True )
+        umat_old    = np.array( umat_new,   copy=True )
+        normOfDiff  = 1.0
+        normOfDiff2 = 1.0
+        threshold   = 1e-6 * numImpOrbs
+        maxiter     = 1000
+        iteration   = 0
+        theDIIS     = DIIS.DIIS(7)
+        startedDIIS = False
+        maxdelta    = 0.1
+        maxdeltanow = maxdelta
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
@@ -149,7 +153,8 @@ class HubbardDMET:
             print "*** DMET iteration",iteration,"***"
             if ( numImpOrbs > 1 ) and ( startedDIIS ):
                 umat_new = theDIIS.Solve()
-            umat_old = np.array( umat_new, copy=True )
+            umat_old2 = np.array( umat_old, copy=True )
+            umat_old  = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
             HamAugment = HamFull.HamFull(self.Ham, self.cluster_size, umat_new, self.skew2by2cell)
@@ -189,7 +194,7 @@ class HubbardDMET:
                 else:
                     assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
                 print "   DMET :: Response (impurity", orbital_i, ") : Number of electrons not in impurity or bath orbitals =", NelecEnvironment_i
-                print "   DMET :: Response (impurity", orbital_i, ") : The sum of discarded occupations = sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
+                print "   DMET :: Response (impurity", orbital_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
                 HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs_i, self.impurityOrbs, numImpOrbs, numBathOrbs )
                 HamDMETs.append( HamDMET_i )
 
@@ -209,8 +214,12 @@ class HubbardDMET:
             if ( iteration==1 ):
                 notSelfConsistentTotalGF = totalGFvalue
 
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
-            normOfDiff = np.linalg.norm( umat_new - umat_old )
+            if ( normOfDiff2 / normOfDiff < 1e-2 ): # Limit cycle with period 2
+                maxdeltanow = 0.1 * np.pi * maxdelta
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM, maxdeltanow )
+            maxdeltanow = maxdelta
+            normOfDiff  = np.linalg.norm( umat_new - umat_old  )
+            normOfDiff2 = np.linalg.norm( umat_new - umat_old2 )
             
             if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
                 startedDIIS = True
