@@ -33,7 +33,7 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
     skew2by2cell = False
-    numBathOrbs  = 6 # Two more than the number of impurity orbitals = np.prod( cluster_size )
+    numBathOrbs  = np.prod( cluster_size ) + 2
     
     theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic, skew2by2cell )
     if ( HubbardU > 6.5 ):

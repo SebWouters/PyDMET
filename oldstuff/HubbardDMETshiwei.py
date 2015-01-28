@@ -63,17 +63,7 @@ class HubbardDMET:
                 impurityOrbs[ tuple(co) ] = 1
         impurityOrbs = np.reshape( impurityOrbs, ( np.prod( self.lattice_size ) ), order='F' ) # HamFull assumes fortran
         return impurityOrbs
-
-    def GroundStateBathOrbitals( self, HamAugment, numPairs ):
-
-        energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamAugment.Tmat, numPairs, True )
-        gs1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
-        numImpOrbs = np.sum( self.impurityOrbs )
-        dmetOrbs, NelecEnvironment, DiscOccupation = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, gs1RDM, numImpOrbs )
-        NelecActiveSpace = 2*numPairs - NelecEnvironment # Floating point number
-        assert( abs( NelecActiveSpace - 2*numImpOrbs ) < 1e-8 ) # For ground-state DMET
-        return dmetOrbs
-
+                
     def SolveGroundState( self, Nelectrons, umat_guess=None ):
     
         numImpOrbs  = np.sum( self.impurityOrbs )
@@ -106,12 +96,28 @@ class HubbardDMET:
             # Augment the Hamiltonian with the embedding potential
             HamAugment = HamFull.HamFull(self.Ham, self.cluster_size, umat_new, self.skew2by2cell)
 
-            # Construct the bath orbitals
-            dmetOrbs = self.GroundStateBathOrbitals( HamAugment, numPairs )
-            NelecActiveSpace = 2 * numImpOrbs
+            # Get the RHF ground state 1RDM and construct the bath orbitals
+            energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamAugment.Tmat, numPairs, True )
+            groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
+            dmetOrbs, NelecEnvironment, DiscOccupation = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, groundstate1RDM, numBathOrbs )
+            NelecActiveSpace = Nelectrons - NelecEnvironment # Floating point number
+            assert( abs( NelecActiveSpace - 2*numImpOrbs ) < 1e-8 ) # For ground-state DMET
+            NelecActiveSpace = int( round( NelecActiveSpace ) + 0.001 )
 
             # Construct the DMET Hamiltonian and get the exact solution
             HamDMET = DMETham.DMETham(self.Ham, HamAugment, dmetOrbs, self.impurityOrbs, numImpOrbs, numBathOrbs)
+
+            if (True):
+                numDMETorbs = HamDMET.getDmetNumOrbitals()
+                OEI = np.zeros([numDMETorbs, numDMETorbs], dtype=float)
+                for cnt1 in range(0, numDMETorbs):
+                    for cnt2 in range(0, numDMETorbs):
+                        OEI[cnt1,cnt2] = HamDMET.getTmatCorr(cnt1, cnt2)
+
+                energiesDMETOEI, solutionDMETOEI = LinalgWrappers.RestrictedHartreeFock( OEI, NelecActiveSpace/2, True )
+                print OEI
+                print energiesDMETOEI - np.average(energiesDMETOEI)
+
             EnergyPerSiteCorr, OneRDMcorr, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMET, NelecActiveSpace )
 
             umat_new = MinimizeCostFunction.Minimize( umat_new, OneRDMcorr, HamDMET, NelecActiveSpace )
@@ -141,17 +147,13 @@ class HubbardDMET:
         assert( (prefactResponseRDM>=0.0) and (prefactResponseRDM<=1.0) )
         
         # Set up a few parameters for the self-consistent response DMET
-        umat_new    = np.array( umat_guess, copy=True )
-        umat_old    = np.array( umat_new,   copy=True )
-        normOfDiff  = 1.0
-        normOfDiff2 = 1.0
-        threshold   = 1e-6 * numImpOrbs
-        maxiter     = 1000
-        iteration   = 0
-        theDIIS     = DIIS.DIIS(7)
-        startedDIIS = False
-        maxdelta    = 0.1
-        maxdeltanow = maxdelta
+        umat_new   = np.array( umat_guess, copy=True )
+        normOfDiff = 1.0
+        threshold  = 1e-6 * numImpOrbs
+        maxiter    = 1000
+        iteration  = 0
+        theDIIS    = DIIS.DIIS(7)
+        startedDIIS= False
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
@@ -159,8 +161,7 @@ class HubbardDMET:
             print "*** DMET iteration",iteration,"***"
             if ( numImpOrbs > 1 ) and ( startedDIIS ):
                 umat_new = theDIIS.Solve()
-            umat_old2 = np.array( umat_old, copy=True )
-            umat_old  = np.array( umat_new, copy=True )
+            umat_old = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
             HamAugment = HamFull.HamFull(self.Ham, self.cluster_size, umat_new, self.skew2by2cell)
@@ -200,7 +201,7 @@ class HubbardDMET:
                 else:
                     assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
                 print "   DMET :: Response (impurity", orbital_i, ") : Number of electrons not in impurity or bath orbitals =", NelecEnvironment_i
-                print "   DMET :: Response (impurity", orbital_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
+                print "   DMET :: Response (impurity", orbital_i, ") : The sum of discarded occupations = sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
                 HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs_i, self.impurityOrbs, numImpOrbs, numBathOrbs )
                 HamDMETs.append( HamDMET_i )
 
@@ -220,12 +221,8 @@ class HubbardDMET:
             if ( iteration==1 ):
                 notSelfConsistentTotalGF = totalGFvalue
 
-            if ( normOfDiff2 / normOfDiff < 1e-2 ): # Limit cycle with period 2
-                maxdeltanow = 0.1 * np.pi * maxdelta
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM, maxdeltanow )
-            maxdeltanow = maxdelta
-            normOfDiff  = np.linalg.norm( umat_new - umat_old  )
-            normOfDiff2 = np.linalg.norm( umat_new - umat_old2 )
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, umat_old, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM )
+            normOfDiff = np.linalg.norm( umat_new - umat_old )
             
             if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
                 startedDIIS = True
@@ -242,128 +239,5 @@ class HubbardDMET:
         print umat_new
         print "***************************************************"
         return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
-
-    def SolveResponseNew( self, umat_gs, Nelectrons, omega, eta, numBathOrbs, toSolve ):
-
-        # Define a few constants
-        numImpOrbs = np.sum( self.impurityOrbs )
-        assert( Nelectrons%2==0 )
-        numPairs = Nelectrons / 2
-        assert( (toSolve=='A') or (toSolve=='R') or (toSolve=='F') or (toSolve=='B') ) # LDOS addition/removal or LDDR forward/backward
-
-        # Obtain the bath orbitals for the ground-state
-        HamAugmentGS = HamFull.HamFull( self.Ham, self.cluster_size, umat_gs, self.skew2by2cell )
-        dmetOrbsGS = self.GroundStateBathOrbitals( HamAugmentGS, numPairs )
-        dmetOrbsGS = dmetOrbsGS[ : , numImpOrbs : 2*numImpOrbs ]
-
-        # Set up a few parameters for the self-consistent response DMET
-        umat_new    = np.array( umat_gs, copy=True )
-        normOfDiff  = 1.0
-        threshold   = 1e-6 * numImpOrbs
-        maxiter     = 1000
-        iteration   = 0
-        #theDIIS     = DIIS.DIIS(7)
-        #startedDIIS = False
-        maxdelta    = 1.0
-        overlap_cut = 1e-7
-
-        while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
-
-            iteration += 1
-            print "*** DMET iteration",iteration,"***"
-            #if ( numImpOrbs > 1 ) and ( startedDIIS ):
-            #    umat_new = theDIIS.Solve()
-            umat_old  = np.array( umat_new, copy=True )
-
-            # Augment the Hamiltonian with the embedding potential
-            HamAugment = HamFull.HamFull(self.Ham, self.cluster_size, umat_new, self.skew2by2cell)
-
-            # Get the RHF ground-state 1-RDM
-            energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamAugment.Tmat, numPairs, True )
-            if ( iteration == 1 ):
-                omegabis = omega
-                chemical_potential_mu = 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] )
-                if ( toSolve == 'A' ) or ( toSolve == 'R' ):
-                    omegabis = omega + chemical_potential_mu # Shift omega with the chemical potential for the retarded Green's function
-            groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
-
-            # Get the RHF mean-field response 1-RDMs
-            response1RDMs = []
-            for orbital_i in self.impIndices:
-                if (toSolve=='A'):
-                    response1RDM = DMETorbitals.Construct1RDM_addition( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                if (toSolve=='R'):
-                    response1RDM = DMETorbitals.Construct1RDM_removal(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                if (toSolve=='F'):
-                    response1RDM = DMETorbitals.Construct1RDM_forward(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                if (toSolve=='B'):
-                    response1RDM = DMETorbitals.Construct1RDM_backward( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                response1RDMs.append( response1RDM )
-
-            # Find a common DMET bath space
-            dmetOrbs = []
-            for orbital_i in range(0, numImpOrbs):
-                dmetOrbs_i, NelecEnvironment_i, DiscOccupation_i = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, response1RDMs[ orbital_i ], numBathOrbs )
-                impurityOrbs = dmetOrbs_i[ :, 0:numImpOrbs ]
-                jointBathOrbs = np.hstack( ( dmetOrbs_i[ :, numImpOrbs:numImpOrbs+numBathOrbs ] , dmetOrbsGS ) )
-                overlapMX = np.dot( jointBathOrbs.T , jointBathOrbs )
-                eigsOverlap, vecsOverlap = LinalgWrappers.SortedEigSymmetric( overlapMX )
-                vecsOverlap = vecsOverlap[ :, eigsOverlap > overlap_cut ]
-                eigsOverlap = eigsOverlap[ eigsOverlap > overlap_cut ]
-                lambdas = np.diagflat( 1.0 / np.sqrt( eigsOverlap ) )
-                transfo = np.dot( vecsOverlap, lambdas )
-                orthoBathOrbs = np.dot( jointBathOrbs , transfo )
-                dmetOrbs_i = np.hstack( ( impurityOrbs, orthoBathOrbs ) )
-                NelecActiveSpaceGuess_i = np.trace( np.dot( np.dot( dmetOrbs_i.T , groundstate1RDM ) , dmetOrbs_i ) )
-                print NelecActiveSpaceGuess_i
-                NelecActiveSpaceGuess_i = 2 * int(round( NelecActiveSpaceGuess_i / 2, 0 ))
-                if ( orbital_i == 0 ):
-                    NcommonBathOrbs = eigsOverlap.shape[0]
-                    NelecActiveSpace = NelecActiveSpaceGuess_i
-                else:
-                    assert( NcommonBathOrbs == eigsOverlap.shape[0] )
-                    assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
-                dmetOrbs.append( dmetOrbs_i )
-            print "   DMET :: Response : Number of impurity + bath orbitals =", numImpOrbs + NcommonBathOrbs
-            print "   DMET :: Response : Number of active space electrons   =", NelecActiveSpace
-
-            HamDMETs = []
-            for orbital_i in range(0, numImpOrbs):
-                HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs[ orbital_i ], self.impurityOrbs, numImpOrbs, NcommonBathOrbs )
-                HamDMETs.append( HamDMET_i )
-
-            # Get the exact solution for each of the impurity orbitals
-            totalGFvalue = 0.0
-            averageGSenergyPerSite = 0.0
-            GS_1RDMs   = []
-            RESP_1RDMs = []
-            for orbital_i in range(0, numImpOrbs):
-                GSenergyPerSite, GS_1RDM, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
-                GFvalue, RESP_1RDM = SolveCorrelated.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSenergyFCI, GSvectorFCI )
-                totalGFvalue += GFvalue
-                averageGSenergyPerSite += GSenergyPerSite
-                GS_1RDMs.append( GS_1RDM )
-                RESP_1RDMs.append( RESP_1RDM )
-            averageGSenergyPerSite = ( 1.0 * averageGSenergyPerSite ) / numImpOrbs
-            if ( iteration==1 ):
-                notSelfConsistentTotalGF = totalGFvalue
-
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, 1.0, maxdelta )
-            normOfDiff = np.linalg.norm( umat_new - umat_old  )
-
-            #if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
-            #    startedDIIS = True
-            #    error = umat_new - umat_old
-            #    error = np.reshape( error, error.shape[0]*error.shape[1] )
-            #    theDIIS.append( error, umat_new )
-
-            print "   DMET :: The average ground-state energy per site =",averageGSenergyPerSite
-            print "   DMET :: The Green's function value (correlated problem) =",totalGFvalue
-            print "   DMET :: The 2-norm of u_new - u_old =",normOfDiff
-            print umat_new
-
-        print "DMET :: Convergence reached. Converged u-matrix:"
-        print umat_new
-        print "***************************************************"
-        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
-
+        
+        

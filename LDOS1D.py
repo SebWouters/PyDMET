@@ -31,7 +31,7 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
     cluster_size = np.array( [   4 ], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
-    numBathOrbs  = 6 # Two more than the number of impurity orbitals = np.prod( cluster_size )
+    numBathOrbs  = np.prod( cluster_size ) + 2
 
     theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
     GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
