@@ -108,7 +108,7 @@ def MinimizeResponse( umat_guess, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpa
     numPairs = NelecActiveSpace / 2
     boundaries = []
     for element in umatflat:
-        boundaries.append( ( element-maxdelta, element+maxdelta ) )
+        boundaries.append( ( element-maxdelta*(1 + np.random.uniform(-0.1, 0.1)), element+maxdelta*(1 + np.random.uniform(-0.1,0.1)) ) )
     result = minimize( CostFunctionResponse, umatflat, args=(GS_1RDMs, RESP_1RDMs, HamDMETs, numPairs, omega, eta, toSolve, prefactResponseRDM), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message

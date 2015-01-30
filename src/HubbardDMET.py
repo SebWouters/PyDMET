@@ -142,7 +142,6 @@ class HubbardDMET:
         
         # Set up a few parameters for the self-consistent response DMET
         umat_new    = np.array( umat_guess, copy=True )
-        umat_old    = np.array( umat_new,   copy=True )
         normOfDiff  = 1.0
         normOfDiff2 = 1.0
         threshold   = 1e-6 * numImpOrbs
@@ -151,7 +150,6 @@ class HubbardDMET:
         theDIIS     = DIIS.DIIS(7)
         startedDIIS = False
         maxdelta    = 0.1
-        maxdeltanow = maxdelta
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
         
@@ -159,7 +157,6 @@ class HubbardDMET:
             print "*** DMET iteration",iteration,"***"
             if ( numImpOrbs > 1 ) and ( startedDIIS ):
                 umat_new = theDIIS.Solve()
-            umat_old2 = np.array( umat_old, copy=True )
             umat_old  = np.array( umat_new, copy=True )
 
             # Augment the Hamiltonian with the embedding potential
@@ -220,12 +217,8 @@ class HubbardDMET:
             if ( iteration==1 ):
                 notSelfConsistentTotalGF = totalGFvalue
 
-            if ( normOfDiff2 / normOfDiff < 1e-2 ): # Limit cycle with period 2
-                maxdeltanow = 0.1 * np.pi * maxdelta
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM, maxdeltanow )
-            maxdeltanow = maxdelta
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM, maxdelta )
             normOfDiff  = np.linalg.norm( umat_new - umat_old  )
-            normOfDiff2 = np.linalg.norm( umat_new - umat_old2 )
             
             if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
                 startedDIIS = True
@@ -243,7 +236,7 @@ class HubbardDMET:
         print "***************************************************"
         return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
 
-    def SolveResponseNew( self, umat_gs, Nelectrons, omega, eta, numBathOrbs, toSolve ):
+    '''def SolveResponseNew( self, umat_gs, Nelectrons, omega, eta, numBathOrbs, toSolve ):
 
         # Define a few constants
         numImpOrbs = np.sum( self.impurityOrbs )
@@ -365,5 +358,5 @@ class HubbardDMET:
         print "DMET :: Convergence reached. Converged u-matrix:"
         print umat_new
         print "***************************************************"
-        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
+        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )'''
 
