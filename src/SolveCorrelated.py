@@ -90,8 +90,8 @@ def SolveGS( HamDMET, NelecActiveSpace, printoutput=False ):
     GSenergyPerSite = GSenergyPerSite / HamDMET.numImpOrbs
     
     return ( GSenergyPerSite, GS_1RDM, GSenergy, GSvector )
-
-def SolveResponse( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput=False ):
+    
+def SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput ):
 
     # We should solve for one of these cases: LDOS addition; LDOS removal; LDDR forward; LDDR backward
     assert( (toSolve=='A') or (toSolve=='R') or (toSolve=='F') or (toSolve=='B') )
@@ -132,17 +132,18 @@ def SolveResponse( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSener
     theFCI = PyCheMPS2.PyFCI( HamCheMPS2, Nel_up, Nel_down, Irrep, maxMemWorkMB, FCIverbose )
     Re2RDMresponse = np.zeros( [ L**4 ], dtype=ctypes.c_double )
     Im2RDMresponse = np.zeros( [ L**4 ], dtype=ctypes.c_double )
+    A_2RDMresponse = np.zeros( [ L**4 ], dtype=ctypes.c_double )
     if (toSolve=='A'):
-        ReGF, ImGF = theFCI.RetardedGF_addition( omega, eta, orb_i, orb_i, True, GSenergy, GSvector, HamCheMPS2, Re2RDMresponse, Im2RDMresponse )
+        ReGF, ImGF = theFCI.RetardedGF_addition( omega, eta, orb_i, orb_i, True, GSenergy, GSvector, HamCheMPS2, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
     if (toSolve=='R'):
-        ReGF, ImGF = theFCI.RetardedGF_removal(  omega, eta, orb_i, orb_i, True, GSenergy, GSvector, HamCheMPS2, Re2RDMresponse, Im2RDMresponse )
+        ReGF, ImGF = theFCI.RetardedGF_removal(  omega, eta, orb_i, orb_i, True, GSenergy, GSvector, HamCheMPS2, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
     if (toSolve=='F'):
-        ReGF, ImGF = theFCI.DensityResponseGF_forward(  omega, eta, orb_i, orb_i, GSenergy, GSvector, Re2RDMresponse, Im2RDMresponse )
+        ReGF, ImGF = theFCI.DensityResponseGF_forward(  omega, eta, orb_i, orb_i, GSenergy, GSvector, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
     if (toSolve=='B'):
-        ReGF, ImGF = theFCI.DensityResponseGF_backward( omega, eta, orb_i, orb_i, GSenergy, GSvector, Re2RDMresponse, Im2RDMresponse )
+        ReGF, ImGF = theFCI.DensityResponseGF_backward( omega, eta, orb_i, orb_i, GSenergy, GSvector, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
     Re2RDMresponse = Re2RDMresponse.reshape( [L, L, L, L], order='F' )
     Im2RDMresponse = Im2RDMresponse.reshape( [L, L, L, L], order='F' )
-    RESP_2RDM = Re2RDMresponse + Im2RDMresponse # Real( <Psi| Operator |Psi> ) = <Real(Psi)| Operator | Real(Psi)> + <Imag(Psi)| Operator | Imag(Psi)>
+    A_2RDMresponse = A_2RDMresponse.reshape( [L, L, L, L], order='F' )
     GFvalue = ReGF + 1j * ImGF
 
     # Reviving output if necessary
@@ -150,18 +151,54 @@ def SolveResponse( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSener
         sys.stdout.flush()
         os.dup2(new_stdout, old_stdout)
         os.close(new_stdout)
+        
+    return ( GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
+
+def SolveResponse( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput=False ):
+
+    GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse = SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput )
+    RESP_2RDM = Re2RDMresponse + Im2RDMresponse # Real( <Psi| Operator |Psi> ) = <Real(Psi)| Operator | Real(Psi)> + <Imag(Psi)| Operator | Imag(Psi)>
 
     # Calculate the 1RDM from the 2RDM
     RESP_1RDM = np.einsum( 'ikjk->ij', RESP_2RDM )
-    RespTrace = np.trace( RESP_1RDM )
-    if (toSolve=='F') or (toSolve=='B'):
-        Normalization = NelecActiveSpace / RespTrace
-    if (toSolve=='A'):
-        Normalization = ( NelecActiveSpace + 1 ) / RespTrace
-    if (toSolve=='R'):
-        Normalization = ( NelecActiveSpace - 1 ) / RespTrace
-    RESP_1RDM = RESP_1RDM * Normalization # Now 1RDM for response as if calculated from normalized wave function
     
-    return ( GFvalue, RESP_1RDM )
+    if (toSolve=='F') or (toSolve=='B'):
+        elecNum = NelecActiveSpace
+    if (toSolve=='A'):
+        elecNum = NelecActiveSpace + 1
+    if (toSolve=='R'):
+        elecNum = NelecActiveSpace - 1
+    
+    # Now 1RDM for response as if calculated from normalized wave function
+    norm = np.trace(RESP_1RDM) / elecNum
+    RESP_1RDM = RESP_1RDM / norm
+    
+    return ( GFvalue, RESP_1RDM, norm )
+    
+def SolveResponse_DDMRG( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput=False ):
+
+    GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse = SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput )
+
+    # Calculate the 1RDMs from the 2RDMs
+    RDM_A = np.einsum( 'ikjk->ij', A_2RDMresponse )
+    RDM_R = np.einsum( 'ikjk->ij', Re2RDMresponse )
+    RDM_I = np.einsum( 'ikjk->ij', Im2RDMresponse )
+    
+    if (toSolve=='F') or (toSolve=='B'):
+        elecNum = NelecActiveSpace
+    if (toSolve=='A'):
+        elecNum = NelecActiveSpace + 1
+    if (toSolve=='R'):
+        elecNum = NelecActiveSpace - 1
+
+    # Now 1RDM for response as if calculated from normalized wave function
+    norm_A = np.trace( RDM_A ) / elecNum
+    norm_R = np.trace( RDM_R ) / elecNum
+    norm_I = np.trace( RDM_I ) / elecNum
+    RDM_A = RDM_A / norm_A
+    RDM_R = RDM_R / norm_R
+    RDM_I = RDM_I / norm_I
+    
+    return ( GFvalue, RDM_A, RDM_R, RDM_I, norm_A, norm_R, norm_I )
 
     

@@ -130,21 +130,21 @@ class HubbardDMET:
         print "***************************************************"
         return ( EnergyPerSiteCorr , umat_new )
         
-    def SolveResponse( self, umat_guess, Nelectrons, omega, eta, numBathOrbs, toSolve, prefactResponseRDM=0.5 ):
+    def SolveResponse( self, umat_guess, Nelectrons, omega, eta, numBathOrbs, toSolve ):
         
         # Define a few constants
+        normalizedRDMs = True
+        errorType = 2 # 1 means cost function per RDM ( GS, response ) and adding cost functions. 2 means adding RDMs and a single cost function of the sum.
         numImpOrbs = np.sum( self.impurityOrbs )
         assert( numBathOrbs >= numImpOrbs )
         assert( Nelectrons%2==0 )
         numPairs = Nelectrons / 2
         assert( (toSolve=='A') or (toSolve=='R') or (toSolve=='F') or (toSolve=='B') ) # LDOS addition/removal or LDDR forward/backward
-        assert( (prefactResponseRDM>=0.0) and (prefactResponseRDM<=1.0) )
         
         # Set up a few parameters for the self-consistent response DMET
         umat_new    = np.array( umat_guess, copy=True )
         normOfDiff  = 1.0
-        normOfDiff2 = 1.0
-        threshold   = 1e-6 * numImpOrbs
+        threshold   = 1e-5
         maxiter     = 1000
         iteration   = 0
         theDIIS     = DIIS.DIIS(7)
@@ -173,33 +173,33 @@ class HubbardDMET:
             groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
             
             # Get the RHF mean-field response 1-RDMs
-            response1RDMs = []
+            # For each impurity site, there's a different set of DMET orbitals and HamDMET
+            HamDMETs = []
             for orbital_i in self.impIndices:
                 if (toSolve=='A'):
-                    response1RDM = DMETorbitals.Construct1RDM_addition( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    #Normalized RDMs : < wfn | a^+ a | wfn > / < wfn | wfn >
+                    #Normalization : < wfn | wfn >
+                    response1RDM, Overlap = DMETorbitals.Construct1RDM_addition( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='R'):
-                    response1RDM = DMETorbitals.Construct1RDM_removal(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    response1RDM, Overlap = DMETorbitals.Construct1RDM_removal(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='F'):
-                    response1RDM = DMETorbitals.Construct1RDM_forward(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    response1RDM, Overlap = DMETorbitals.Construct1RDM_forward(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='B'):
-                    response1RDM = DMETorbitals.Construct1RDM_backward( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                response1RDMs.append( response1RDM )
-
-            HamDMETs = []
-            for orbital_i in range(0, numImpOrbs):
-                # The response1RDM was calculated based on a normalized wavefunction: make a weighted average
-                weighted1RDM_i = ( 1.0 - prefactResponseRDM ) * groundstate1RDM + prefactResponseRDM * response1RDMs[ orbital_i ]
-                # For each impurity site, there's a different set of DMET orbitals
+                    response1RDM, Overlap = DMETorbitals.Construct1RDM_backward( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                if ( normalizedRDMs == True ):
+                    weighted1RDM_i = ( groundstate1RDM + response1RDM ) * 0.5
+                else:
+                    weighted1RDM_i = ( groundstate1RDM + Overlap * response1RDM ) / ( 1.0 + Overlap )
                 dmetOrbs_i, NelecEnvironment_i, DiscOccupation_i = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, weighted1RDM_i, numBathOrbs )
                 NelecActiveSpaceGuess_i = int( round( Nelectrons - NelecEnvironment_i ) + 0.001 ) # Now it should be of integer type
                 if ( orbital_i == 0 ):
                     NelecActiveSpace = NelecActiveSpaceGuess_i
                 else:
                     assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
-                print "   DMET :: Response (impurity", orbital_i, ") : Number of electrons not in impurity or bath orbitals =", NelecEnvironment_i
                 print "   DMET :: Response (impurity", orbital_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
                 HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs_i, self.impurityOrbs, numImpOrbs, numBathOrbs )
                 HamDMETs.append( HamDMET_i )
+            print "   DMET :: Response : Number of electrons in the active space =", NelecActiveSpace
 
             # Get the exact solution for each of the impurity orbitals
             totalGFvalue = 0.0
@@ -207,17 +207,20 @@ class HubbardDMET:
             GS_1RDMs   = []
             RESP_1RDMs = []
             for orbital_i in range(0, numImpOrbs):
-                GSenergyPerSite, GS_1RDM, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
-                GFvalue, RESP_1RDM = SolveCorrelated.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSenergyFCI, GSvectorFCI )
+                GSsiteE, GS1RDM, GSfciE, GSvector = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
+                GFvalue, RESP_1RDM, norm_1RDM = SolveCorrelated.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSfciE, GSvector )
                 totalGFvalue += GFvalue
-                averageGSenergyPerSite += GSenergyPerSite
-                GS_1RDMs.append( GS_1RDM )
-                RESP_1RDMs.append( RESP_1RDM )
+                averageGSenergyPerSite += GSsiteE
+                GS_1RDMs.append( GS1RDM )
+                if ( normalizedRDMs == True ):
+                    RESP_1RDMs.append( RESP_1RDM )
+                else:
+                    RESP_1RDMs.append( norm_1RDM * RESP_1RDM )
             averageGSenergyPerSite = ( 1.0 * averageGSenergyPerSite ) / numImpOrbs
             if ( iteration==1 ):
                 notSelfConsistentTotalGF = totalGFvalue
 
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, prefactResponseRDM, maxdelta )
+            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, maxdelta, normalizedRDMs, errorType )
             normOfDiff  = np.linalg.norm( umat_new - umat_old  )
             
             if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
@@ -236,32 +239,29 @@ class HubbardDMET:
         print "***************************************************"
         return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
 
-    '''def SolveResponseNew( self, umat_gs, Nelectrons, omega, eta, numBathOrbs, toSolve ):
-
+    def SolveResponse_DDMRG( self, umat_guess, Nelectrons, omega, eta, numBathOrbs, toSolve ):
+        
         # Define a few constants
+        normalizedRDMs = True
+        errorType = 2 # 1 means cost function per RDM ( GS, response ) and adding cost functions. 2 means adding RDMs and a single cost function of the sum.
         numImpOrbs = np.sum( self.impurityOrbs )
+        assert( numBathOrbs >= numImpOrbs )
         assert( Nelectrons%2==0 )
         numPairs = Nelectrons / 2
         assert( (toSolve=='A') or (toSolve=='R') or (toSolve=='F') or (toSolve=='B') ) # LDOS addition/removal or LDDR forward/backward
-
-        # Obtain the bath orbitals for the ground-state
-        HamAugmentGS = HamFull.HamFull( self.Ham, self.cluster_size, umat_gs, self.skew2by2cell )
-        dmetOrbsGS = self.GroundStateBathOrbitals( HamAugmentGS, numPairs )
-        dmetOrbsGS = dmetOrbsGS[ : , numImpOrbs : 2*numImpOrbs ]
-
+        
         # Set up a few parameters for the self-consistent response DMET
-        umat_new    = np.array( umat_gs, copy=True )
+        umat_new    = np.array( umat_guess, copy=True )
         normOfDiff  = 1.0
-        threshold   = 1e-6 * numImpOrbs
+        threshold   = 1e-5
         maxiter     = 1000
         iteration   = 0
         #theDIIS     = DIIS.DIIS(7)
         #startedDIIS = False
-        maxdelta    = 1.0
-        overlap_cut = 1e-7
+        maxdelta    = 0.1
 
         while ( normOfDiff >= threshold ) and ( iteration < maxiter ):
-
+        
             iteration += 1
             print "*** DMET iteration",iteration,"***"
             #if ( numImpOrbs > 1 ) and ( startedDIIS ):
@@ -274,89 +274,83 @@ class HubbardDMET:
             # Get the RHF ground-state 1-RDM
             energiesRHF, solutionRHF = LinalgWrappers.RestrictedHartreeFock( HamAugment.Tmat, numPairs, True )
             if ( iteration == 1 ):
-                omegabis = omega
                 chemical_potential_mu = 0.5 * ( energiesRHF[ numPairs-1 ] + energiesRHF[ numPairs ] )
                 if ( toSolve == 'A' ) or ( toSolve == 'R' ):
                     omegabis = omega + chemical_potential_mu # Shift omega with the chemical potential for the retarded Green's function
+                else:
+                    omegabis = omega
             groundstate1RDM = DMETorbitals.Construct1RDM_groundstate( solutionRHF, numPairs )
-
+            
             # Get the RHF mean-field response 1-RDMs
-            response1RDMs = []
+            # For each impurity site, there's a different set of DMET orbitals and HamDMET
+            HamDMETs = []
             for orbital_i in self.impIndices:
                 if (toSolve=='A'):
-                    response1RDM = DMETorbitals.Construct1RDM_addition( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    #Normalized RDMs : < wfn | a^+ a | wfn > / < wfn | wfn >
+                    #Normalization : < wfn | wfn >
+                    RDM_A, RDM_R, RDM_I, S_A, S_R, S_I = DMETorbitals.Construct1RDM_addition_bis( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='R'):
-                    response1RDM = DMETorbitals.Construct1RDM_removal(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    RDM_A, RDM_R, RDM_I, S_A, S_R, S_I = DMETorbitals.Construct1RDM_removal_bis(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='F'):
-                    response1RDM = DMETorbitals.Construct1RDM_forward(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                    RDM_A, RDM_R, RDM_I, S_A, S_R, S_I = DMETorbitals.Construct1RDM_forward_bis(  orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
                 if (toSolve=='B'):
-                    response1RDM = DMETorbitals.Construct1RDM_backward( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
-                response1RDMs.append( response1RDM )
-
-            # Find a common DMET bath space
-            dmetOrbs = []
-            for orbital_i in range(0, numImpOrbs):
-                dmetOrbs_i, NelecEnvironment_i, DiscOccupation_i = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, response1RDMs[ orbital_i ], numBathOrbs )
-                impurityOrbs = dmetOrbs_i[ :, 0:numImpOrbs ]
-                jointBathOrbs = np.hstack( ( dmetOrbs_i[ :, numImpOrbs:numImpOrbs+numBathOrbs ] , dmetOrbsGS ) )
-                overlapMX = np.dot( jointBathOrbs.T , jointBathOrbs )
-                eigsOverlap, vecsOverlap = LinalgWrappers.SortedEigSymmetric( overlapMX )
-                vecsOverlap = vecsOverlap[ :, eigsOverlap > overlap_cut ]
-                eigsOverlap = eigsOverlap[ eigsOverlap > overlap_cut ]
-                lambdas = np.diagflat( 1.0 / np.sqrt( eigsOverlap ) )
-                transfo = np.dot( vecsOverlap, lambdas )
-                orthoBathOrbs = np.dot( jointBathOrbs , transfo )
-                dmetOrbs_i = np.hstack( ( impurityOrbs, orthoBathOrbs ) )
-                NelecActiveSpaceGuess_i = np.trace( np.dot( np.dot( dmetOrbs_i.T , groundstate1RDM ) , dmetOrbs_i ) )
-                print NelecActiveSpaceGuess_i
-                NelecActiveSpaceGuess_i = 2 * int(round( NelecActiveSpaceGuess_i / 2, 0 ))
+                    RDM_A, RDM_R, RDM_I, S_A, S_R, S_I = DMETorbitals.Construct1RDM_backward_bis( orbital_i, omegabis, eta, energiesRHF, solutionRHF, groundstate1RDM, numPairs )
+                if ( normalizedRDMs == True ):
+                    weighted1RDM_i = ( groundstate1RDM + RDM_A + RDM_R + RDM_I ) * 0.25
+                else:
+                    weighted1RDM_i = ( groundstate1RDM + S_A * RDM_A + S_R * RDM_R + S_I * RDM_I ) / ( 1.0 + S_A + S_R + S_I )
+                dmetOrbs_i, NelecEnvironment_i, DiscOccupation_i = DMETorbitals.ConstructBathOrbitals( self.impurityOrbs, weighted1RDM_i, numBathOrbs )
+                NelecActiveSpaceGuess_i = int( round( Nelectrons - NelecEnvironment_i ) + 0.001 ) # Now it should be of integer type
                 if ( orbital_i == 0 ):
-                    NcommonBathOrbs = eigsOverlap.shape[0]
                     NelecActiveSpace = NelecActiveSpaceGuess_i
                 else:
-                    assert( NcommonBathOrbs == eigsOverlap.shape[0] )
                     assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
-                dmetOrbs.append( dmetOrbs_i )
-            print "   DMET :: Response : Number of impurity + bath orbitals =", numImpOrbs + NcommonBathOrbs
-            print "   DMET :: Response : Number of active space electrons   =", NelecActiveSpace
-
-            HamDMETs = []
-            for orbital_i in range(0, numImpOrbs):
-                HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs[ orbital_i ], self.impurityOrbs, numImpOrbs, NcommonBathOrbs )
+                print "   DMET :: Response (impurity", orbital_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
+                HamDMET_i = DMETham.DMETham( self.Ham, HamAugment, dmetOrbs_i, self.impurityOrbs, numImpOrbs, numBathOrbs )
                 HamDMETs.append( HamDMET_i )
+            print "   DMET :: Response : Number of electrons in the active space =", NelecActiveSpace
 
             # Get the exact solution for each of the impurity orbitals
             totalGFvalue = 0.0
             averageGSenergyPerSite = 0.0
-            GS_1RDMs   = []
-            RESP_1RDMs = []
+            ED_RDM_0 = []
+            ED_RDM_A = []
+            ED_RDM_R = []
+            ED_RDM_I = []
             for orbital_i in range(0, numImpOrbs):
-                GSenergyPerSite, GS_1RDM, GSenergyFCI, GSvectorFCI = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
-                GFvalue, RESP_1RDM = SolveCorrelated.SolveResponse( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSenergyFCI, GSvectorFCI )
+                GSsiteE, GS1RDM, GSfciE, GSvector = SolveCorrelated.SolveGS( HamDMETs[ orbital_i ], NelecActiveSpace )
+                GFvalue, RDM_A, RDM_R, RDM_I, S_A, S_R, S_I = SolveCorrelated.SolveResponse_DDMRG( HamDMETs[ orbital_i ], NelecActiveSpace, orbital_i, omegabis, eta, toSolve, GSfciE, GSvector )
                 totalGFvalue += GFvalue
-                averageGSenergyPerSite += GSenergyPerSite
-                GS_1RDMs.append( GS_1RDM )
-                RESP_1RDMs.append( RESP_1RDM )
+                averageGSenergyPerSite += GSsiteE
+                ED_RDM_0.append( GS1RDM )
+                if ( normalizedRDMs == True ):
+                    ED_RDM_A.append( RDM_A )
+                    ED_RDM_R.append( RDM_R )
+                    ED_RDM_I.append( RDM_I )
+                else:
+                    ED_RDM_A.append( S_A * RDM_A )
+                    ED_RDM_R.append( S_R * RDM_R )
+                    ED_RDM_I.append( S_I * RDM_I )
             averageGSenergyPerSite = ( 1.0 * averageGSenergyPerSite ) / numImpOrbs
             if ( iteration==1 ):
                 notSelfConsistentTotalGF = totalGFvalue
 
-            umat_new = MinimizeCostFunction.MinimizeResponse( umat_new, GS_1RDMs, RESP_1RDMs, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, 1.0, maxdelta )
-            normOfDiff = np.linalg.norm( umat_new - umat_old  )
-
+            umat_new = MinimizeCostFunction.MinimizeResponse_DDMRG( umat_new, ED_RDM_0, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMETs, NelecActiveSpace, omegabis, eta, toSolve, maxdelta, normalizedRDMs, errorType )
+            normOfDiff  = np.linalg.norm( umat_new - umat_old  )
+            
             #if ( numImpOrbs > 1 ) and (( normOfDiff < 1e-3 ) or ( startedDIIS )):
             #    startedDIIS = True
             #    error = umat_new - umat_old
             #    error = np.reshape( error, error.shape[0]*error.shape[1] )
             #    theDIIS.append( error, umat_new )
-
+            
             print "   DMET :: The average ground-state energy per site =",averageGSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",totalGFvalue
             print "   DMET :: The 2-norm of u_new - u_old =",normOfDiff
             print umat_new
-
+        
         print "DMET :: Convergence reached. Converged u-matrix:"
         print umat_new
         print "***************************************************"
-        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )'''
+        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
 

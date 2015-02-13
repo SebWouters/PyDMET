@@ -17,7 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 '''
 
-# This class defined the matrix elements relevant for the DMET impurity + bath problem
+# This class contains the matrix elements relevant for the DMET impurity + bath problem
 
 import numpy as np
 
