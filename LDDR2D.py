@@ -32,15 +32,11 @@ def CalculateLDDR( HubbardU, Omegas, eta ):
     cluster_size = np.array( [ 2,  2], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
-    skew2by2cell = False
     numBathOrbs  = np.prod( cluster_size ) + 2
     
-    theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic, skew2by2cell )
+    theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
     if ( HubbardU > 6.5 ):
-        if ( skew2by2cell ):
-            umat_guess = InsulatingPMguess.PullSkew2by2( HubbardU )
-        else:
-            umat_guess = InsulatingPMguess.PullSquare2by2( HubbardU )
+        umat_guess = InsulatingPMguess.PullSquare2by2( HubbardU )
     else:
         umat_guess = None
     GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons, umat_guess )

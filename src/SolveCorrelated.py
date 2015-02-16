@@ -153,29 +153,8 @@ def SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GS
         os.close(new_stdout)
         
     return ( GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse )
-
+    
 def SolveResponse( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput=False ):
-
-    GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse = SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput )
-    RESP_2RDM = Re2RDMresponse + Im2RDMresponse # Real( <Psi| Operator |Psi> ) = <Real(Psi)| Operator | Real(Psi)> + <Imag(Psi)| Operator | Imag(Psi)>
-
-    # Calculate the 1RDM from the 2RDM
-    RESP_1RDM = np.einsum( 'ikjk->ij', RESP_2RDM )
-    
-    if (toSolve=='F') or (toSolve=='B'):
-        elecNum = NelecActiveSpace
-    if (toSolve=='A'):
-        elecNum = NelecActiveSpace + 1
-    if (toSolve=='R'):
-        elecNum = NelecActiveSpace - 1
-    
-    # Now 1RDM for response as if calculated from normalized wave function
-    norm = np.trace(RESP_1RDM) / elecNum
-    RESP_1RDM = RESP_1RDM / norm
-    
-    return ( GFvalue, RESP_1RDM, norm )
-    
-def SolveResponse_DDMRG( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput=False ):
 
     GFvalue, Re2RDMresponse, Im2RDMresponse, A_2RDMresponse = SolveResponseBASE( HamDMET, NelecActiveSpace, orb_i, omega, eta, toSolve, GSenergy, GSvector, printoutput )
 

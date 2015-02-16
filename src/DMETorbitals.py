@@ -25,22 +25,8 @@ def Construct1RDM_groundstate( solutionRHF, numPairs ):
     DoublyOccOrbs = solutionRHF[:, 0:numPairs]
     GS_OneRDM = 2 * np.dot( DoublyOccOrbs , DoublyOccOrbs.T )
     return GS_OneRDM
-
+    
 def Construct1RDM_addition( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
-
-    # vector(l) = \sum_{alpha ### VIRTUAL ###} C_{l,alpha} C^+_{alpha,i} / ( omega - epsilon_alpha + I*eta)
-    Vector  = 1.0 / ( omega - eigsRHF[ numPairs: ] + 1j*eta )
-    Vector  = np.multiply( Vector , solutionRHF[ orbital_i, numPairs: ] )
-    Vector  = np.matrix( np.dot( solutionRHF[ :, numPairs: ] , Vector.T ) )
-    if (Vector.shape[0] > 1):
-        Vector = Vector.T # Now certainly row-like matrix (shape = 1 x len(vector))
-    Overlap = np.dot( Vector, Vector.H ).real[0,0] # A Hermitian scalar is always real-valued
-    Matrix  = np.dot( Vector.H, Vector ).real
-    
-    addition1RDM = groundstate1RDM + Matrix / Overlap
-    return ( addition1RDM , Overlap )
-    
-def Construct1RDM_addition_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
 
     C_i_virt = np.matrix( solutionRHF[ orbital_i , numPairs: ] )
     if (C_i_virt.shape[0] > 1):
@@ -77,20 +63,6 @@ def Construct1RDM_addition_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, gro
     return ( RDM_add_A, RDM_add_R, RDM_add_I, Overlap_A, Overlap_R, Overlap_I )
     
 def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
-
-    # vector(l) = \sum_{alpha ### OCCUPIED ###} C_{l,alpha} C^+_{alpha,i} / ( omega - epsilon_alpha + I*eta)
-    Vector  = 1.0 / ( omega - eigsRHF[ 0:numPairs ] + 1j*eta )
-    Vector  = np.multiply( Vector , solutionRHF[ orbital_i, 0:numPairs ] )
-    Vector  = np.matrix( np.dot( solutionRHF[ :, 0:numPairs ] , Vector.T ) )
-    if (Vector.shape[0] > 1):
-        Vector = Vector.T # Now certainly row-like matrix (shape = 1 x len(vector))
-    Overlap = np.dot( Vector, Vector.H ).real[0,0] # A Hermitian scalar is always real-valued
-    Matrix  = np.dot( Vector.H, Vector ).real
-
-    removal1RDM = groundstate1RDM - Matrix / Overlap # Minus sign!
-    return ( removal1RDM , Overlap )
-    
-def Construct1RDM_removal_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
 
     C_i_occ = np.matrix( solutionRHF[ orbital_i , :numPairs ] )
     if (C_i_occ.shape[0] > 1):
@@ -134,23 +106,6 @@ def ConstructMeanFieldLDOS( orbital_i, omega, eta, eigsRHF, solutionRHF, numPair
     return LDOS
     
 def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
-
-    # matrix(alpha,beta) = C^+_{alpha,i} C_{i,beta} / ( omega - ( epsilon_alpha - epsilon_beta ) + I*eta )
-    nRows, nCols = solutionRHF.shape
-    Matrix = np.zeros([ nRows - numPairs, numPairs ], dtype=complex) # First index (alpha) virtual, second index (beta) occupied
-    for virt in range(numPairs, nRows):
-        for occ in range(0, numPairs):
-            Matrix[ virt - numPairs , occ ] = solutionRHF[ orbital_i, virt ] * solutionRHF[ orbital_i, occ ] / ( omega - eigsRHF[ virt ] + eigsRHF[ occ ] + 1j*eta )
-    Matrix = np.matrix( Matrix )
-    
-    Overlap = 2 * np.trace( np.dot( Matrix , Matrix.H ) ).real
-    Matrix1 = 2 * np.dot( solutionRHF[ : , numPairs:  ] , np.dot( np.dot( Matrix, Matrix.H ) , solutionRHF[ : , numPairs:  ].T ) ).real
-    Matrix2 = 2 * np.dot( solutionRHF[ : , 0:numPairs ] , np.dot( np.dot( Matrix.H, Matrix ) , solutionRHF[ : , 0:numPairs ].T ) ).real
-    
-    forward1RDM = groundstate1RDM + ( Matrix1 - Matrix2 ) / Overlap
-    return ( forward1RDM , Overlap )
-    
-def Construct1RDM_forward_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
     
     C_i_virt = np.matrix( solutionRHF[ orbital_i , numPairs: ] )
     if (C_i_virt.shape[0] > 1):
@@ -198,10 +153,6 @@ def Construct1RDM_forward_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, grou
 def Construct1RDM_backward( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
 
     return Construct1RDM_forward( orbital_i, -omega, -eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs )
-    
-def Construct1RDM_backward_bis( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
-
-    return Construct1RDM_forward_bis( orbital_i, -omega, -eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs )
     
 def ConstructBathOrbitals( impurityOrbs, OneRDM, numBathOrbs ):
 
