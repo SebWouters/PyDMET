@@ -23,7 +23,7 @@ import math as m
 def Construct1RDM_groundstate( solutionRHF, numPairs ):
 
     DoublyOccOrbs = solutionRHF[:, 0:numPairs]
-    GS_OneRDM = 2 * np.dot( DoublyOccOrbs , DoublyOccOrbs.T )
+    GS_OneRDM = 2 * (np.dot( DoublyOccOrbs , DoublyOccOrbs.conj().T )).real # For ndarrays there's no ".H"
     return GS_OneRDM
     
 def Construct1RDM_addition( orbital_i, omega, eta, eigsRHF, solutionRHF, groundstate1RDM, numPairs ):
@@ -32,33 +32,33 @@ def Construct1RDM_addition( orbital_i, omega, eta, eigsRHF, solutionRHF, grounds
     if (C_i_virt.shape[0] > 1):
         C_i_virt = C_i_virt.T # Now certainly row-like matrix (shape = 1 x len(C_i_virt))
     
-    Overlap_A = np.dot( C_i_virt , C_i_virt.T )[0,0]
-    Vector_A = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt.T ) )
+    Overlap_A = (np.dot( C_i_virt , C_i_virt.H )[0,0]).real
+    Vector_A = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt.H ) )
     if (Vector_A.shape[0] > 1):
         Vector_A = Vector_A.T
-    RDM_add_A = groundstate1RDM + np.dot( Vector_A.T , Vector_A ) / Overlap_A
+    RDM_add_A = groundstate1RDM + (np.dot( Vector_A.H , Vector_A )).real / Overlap_A
     
     center_R = omega - eigsRHF[ numPairs: ] # (omega - eps_virt)
     center_R = np.multiply( center_R , 1.0 / ( np.multiply( center_R , center_R ) + eta*eta ) ) # (omega - eps_virt) / [ (omega - eps_virt)^2 + eta^2 ]
     C_i_virt_R = np.matrix( np.multiply( C_i_virt, center_R ) )
     if (C_i_virt_R.shape[0] > 1):
         C_i_virt_R = C_i_virt_R.T
-    Overlap_R = np.dot( C_i_virt_R, C_i_virt_R.T )[0,0]
-    Vector_R = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt_R.T ) )
+    Overlap_R = (np.dot( C_i_virt_R, C_i_virt_R.H )[0,0]).real
+    Vector_R = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt_R.H ) )
     if (Vector_R.shape[0] > 1):
         Vector_R = Vector_R.T
-    RDM_add_R = groundstate1RDM + np.dot( Vector_R.T , Vector_R ) / Overlap_R
+    RDM_add_R = groundstate1RDM + (np.dot( Vector_R.H , Vector_R )).real / Overlap_R
     
     center_I = omega - eigsRHF[ numPairs: ] # (omega - eps_virt)
     center_I = eta / ( np.multiply( center_I , center_I ) + eta*eta ) # eta / [ (omega - eps_virt)^2 + eta^2 ]
     C_i_virt_I = np.matrix( np.multiply( C_i_virt, center_I ) )
     if (C_i_virt_I.shape[0] > 1):
         C_i_virt_I = C_i_virt_I.T
-    Overlap_I = np.dot( C_i_virt_I, C_i_virt_I.T )[0,0]
-    Vector_I = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt_I.T ) )
+    Overlap_I = (np.dot( C_i_virt_I, C_i_virt_I.H )[0,0]).real
+    Vector_I = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt_I.H ) )
     if (Vector_I.shape[0] > 1):
         Vector_I = Vector_I.T
-    RDM_add_I = groundstate1RDM + np.dot( Vector_I.T , Vector_I ) / Overlap_I
+    RDM_add_I = groundstate1RDM + (np.dot( Vector_I.H , Vector_I )).real / Overlap_I
     
     return ( RDM_add_A, RDM_add_R, RDM_add_I, Overlap_A, Overlap_R, Overlap_I )
     
@@ -68,33 +68,33 @@ def Construct1RDM_removal( orbital_i, omega, eta, eigsRHF, solutionRHF, groundst
     if (C_i_occ.shape[0] > 1):
         C_i_occ = C_i_occ.T # Now certainly row-like matrix (shape = 1 x len(C_i_occ))
     
-    Overlap_A = np.dot( C_i_occ , C_i_occ.T )[0,0]
-    Vector_A = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ.T ) )
+    Overlap_A = (np.dot( C_i_occ , C_i_occ.H )[0,0]).real
+    Vector_A = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ.H ) )
     if (Vector_A.shape[0] > 1):
         Vector_A = Vector_A.T
-    RDM_rem_A = groundstate1RDM - np.dot( Vector_A.T , Vector_A ) / Overlap_A # Minus sign!!
+    RDM_rem_A = groundstate1RDM - (np.dot( Vector_A.H , Vector_A )).real / Overlap_A # Minus sign!!
     
     center_R = omega - eigsRHF[ :numPairs ] # (omega - eps_occ)
     center_R = np.multiply( center_R , 1.0 / ( np.multiply( center_R , center_R ) + eta*eta ) ) # (omega - eps_occ) / [ (omega - eps_occ)^2 + eta^2 ]
     C_i_occ_R = np.matrix( np.multiply( C_i_occ, center_R ) )
     if (C_i_occ_R.shape[0] > 1):
         C_i_occ_R = C_i_occ_R.T
-    Overlap_R = np.dot( C_i_occ_R, C_i_occ_R.T )[0,0]
-    Vector_R = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ_R.T ) )
+    Overlap_R = (np.dot( C_i_occ_R, C_i_occ_R.H )[0,0]).real
+    Vector_R = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ_R.H ) )
     if (Vector_R.shape[0] > 1):
         Vector_R = Vector_R.T
-    RDM_rem_R = groundstate1RDM - np.dot( Vector_R.T , Vector_R ) / Overlap_R # Minus sign!!
+    RDM_rem_R = groundstate1RDM - (np.dot( Vector_R.H , Vector_R )).real / Overlap_R # Minus sign!!
     
     center_I = omega - eigsRHF[ :numPairs ] # (omega - eps_occ)
     center_I = eta / ( np.multiply( center_I , center_I ) + eta*eta ) # eta / [ (omega - eps_occ)^2 + eta^2 ]
     C_i_occ_I = np.matrix( np.multiply( C_i_occ, center_I ) )
     if (C_i_occ_I.shape[0] > 1):
         C_i_occ_I = C_i_occ_I.T
-    Overlap_I = np.dot( C_i_occ_I, C_i_occ_I.T )[0,0]
-    Vector_I = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ_I.T ) )
+    Overlap_I = (np.dot( C_i_occ_I, C_i_occ_I.H )[0,0]).real
+    Vector_I = np.matrix( np.dot( solutionRHF[ : , :numPairs ] , C_i_occ_I.H ) )
     if (Vector_I.shape[0] > 1):
         Vector_I = Vector_I.T
-    RDM_rem_I = groundstate1RDM - np.dot( Vector_I.T , Vector_I ) / Overlap_I # Minus sign!!
+    RDM_rem_I = groundstate1RDM - (np.dot( Vector_I.H , Vector_I )).real / Overlap_I # Minus sign!!
     
     return ( RDM_rem_A, RDM_rem_R, RDM_rem_I, Overlap_A, Overlap_R, Overlap_I )
     
@@ -115,38 +115,38 @@ def Construct1RDM_forward( orbital_i, omega, eta, eigsRHF, solutionRHF, groundst
     if (C_i_occ.shape[0] > 1):
         C_i_occ = C_i_occ.T
     
-    II_virt = np.dot( C_i_virt , C_i_virt.T )[0,0]
+    II_virt = (np.dot( C_i_virt , C_i_virt.H )[0,0]).real
     TwoII_occ = groundstate1RDM[ orbital_i, orbital_i ]
     Overlap_A = TwoII_occ * II_virt
-    Vector_A = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt.T ) )
+    Vector_A = np.matrix( np.dot( solutionRHF[ : , numPairs: ] , C_i_virt.H ) )
     if (Vector_A.shape[0] > 1):
         Vector_A = Vector_A.T
     Vector_A2 = np.matrix( groundstate1RDM[ : , orbital_i ] )
     if (Vector_A2.shape[0] > 1):
         Vector_A2 = Vector_A2.T
-    RDM_fw_A = groundstate1RDM + ( np.dot( Vector_A.T , Vector_A ) * TwoII_occ - 0.5 * II_virt * np.dot( Vector_A2.T , Vector_A2 ) ) / Overlap_A
+    RDM_fw_A = groundstate1RDM + ( (np.dot( Vector_A.H , Vector_A )).real * TwoII_occ - 0.5 * II_virt * (np.dot( Vector_A2.H , Vector_A2 )).real ) / Overlap_A
     
-    center_R = np.zeros([ C_i_virt.shape[1] , C_i_occ.shape[1] ], dtype=float)
+    center_R = np.zeros([ C_i_virt.shape[1] , C_i_occ.shape[1] ], dtype=complex)
     for virt in range( C_i_virt.shape[1] ):
         for occ in range( C_i_occ.shape[1] ):
             base = omega - ( eigsRHF[ numPairs + virt ] - eigsRHF[ occ ] )
             central = base / ( base * base + eta * eta )
-            center_R[ virt, occ ] = solutionRHF[ orbital_i, numPairs + virt ] * central * solutionRHF[ orbital_i, occ ]
-    Overlap_R = 2 * np.sum( np.multiply( center_R, center_R ) )
+            center_R[ virt, occ ] = (solutionRHF[ orbital_i, numPairs + virt ]).conj() * central * solutionRHF[ orbital_i, occ ]
+    Overlap_R = 2 * (np.sum( np.multiply( center_R, center_R.conj() ) )).real
     RDM_fw_R = groundstate1RDM \
-             + 2 * ( np.dot( np.dot( solutionRHF[ :, numPairs: ], np.dot( center_R , center_R.T ) ) , ( solutionRHF[ :, numPairs: ] ).T ) \
-                   - np.dot( np.dot( solutionRHF[ :, :numPairs ], np.dot( center_R.T , center_R ) ) , ( solutionRHF[ :, :numPairs ] ).T ) ) / Overlap_R
+             + 2 * ( np.dot( np.dot( solutionRHF[ :, numPairs: ], np.dot( center_R , center_R.H ) ) , ( solutionRHF[ :, numPairs: ] ).H ) \
+                   - np.dot( np.dot( solutionRHF[ :, :numPairs ], np.dot( center_R.H , center_R ) ) , ( solutionRHF[ :, :numPairs ] ).H ) ).real / Overlap_R
     
-    center_I = np.zeros([ C_i_virt.shape[1] , C_i_occ.shape[1] ], dtype=float)
+    center_I = np.zeros([ C_i_virt.shape[1] , C_i_occ.shape[1] ], dtype=complex)
     for virt in range( C_i_virt.shape[1] ):
         for occ in range( C_i_occ.shape[1] ):
             base = omega - ( eigsRHF[ numPairs + virt ] - eigsRHF[ occ ] )
             central = eta / ( base * base + eta * eta )
-            center_I[ virt, occ ] = solutionRHF[ orbital_i, numPairs + virt ] * central * solutionRHF[ orbital_i, occ ]
-    Overlap_I = 2 * np.sum( np.multiply( center_I, center_I ) )
+            center_I[ virt, occ ] = (solutionRHF[ orbital_i, numPairs + virt ]).conj() * central * solutionRHF[ orbital_i, occ ]
+    Overlap_I = 2 * (np.sum( np.multiply( center_I, center_I.conj() ) )).real
     RDM_fw_I = groundstate1RDM \
-             + 2 * ( np.dot( np.dot( solutionRHF[ :, numPairs: ], np.dot( center_I , center_I.T ) ) , ( solutionRHF[ :, numPairs: ] ).T ) \
-                   - np.dot( np.dot( solutionRHF[ :, :numPairs ], np.dot( center_I.T , center_I ) ) , ( solutionRHF[ :, :numPairs ] ).T ) ) / Overlap_I
+             + 2 * ( np.dot( np.dot( solutionRHF[ :, numPairs: ], np.dot( center_I , center_I.H ) ) , ( solutionRHF[ :, numPairs: ] ).H ) \
+                   - np.dot( np.dot( solutionRHF[ :, :numPairs ], np.dot( center_I.H , center_I ) ) , ( solutionRHF[ :, :numPairs ] ).H ) ).real / Overlap_I
     
     return ( RDM_fw_A, RDM_fw_R, RDM_fw_I, Overlap_A, Overlap_R, Overlap_I )
     

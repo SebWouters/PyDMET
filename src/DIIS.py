@@ -33,6 +33,10 @@ class DIIS:
         if len( self.errors ) > self.numVecs:
             self.errors.pop(0)
             self.states.pop(0)
+
+    def flush( self ):
+        self.errors = []
+        self.states = []
         
     def Solve( self ):
         nStates = len( self.errors )

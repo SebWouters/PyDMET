@@ -45,7 +45,7 @@ if ( case2run == 2 ):
 if ( case2run == 3 ):
 
     HubbardU = 8.0
-    Omegas   = np.arange( 6.00, 6.01, 0.04) #np.array([ 8.0 ])
+    Omegas   = np.arange( 0.0, 8.01, 0.04) #np.array([ 8.0 ])
     eta      = 0.05
     #Local density of states spectral function
     LDOS = LDOS1D.CalculateLDOS( HubbardU, Omegas, eta )

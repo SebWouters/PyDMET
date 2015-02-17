@@ -23,7 +23,7 @@ import sys
 sys.path.append('src')
 import HubbardDMET
 
-def CalculateLDOS( HubbardU, Omegas, eta ):
+def CalculateLDOS( HubbardU, Omegas, eta, doSelfConsistent=True ):
 
     LDOS = []
 
@@ -35,16 +35,23 @@ def CalculateLDOS( HubbardU, Omegas, eta ):
 
     theDMET = HubbardDMET.HubbardDMET( lattice_size, cluster_size, HubbardU, antiPeriodic )
     GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons )
+    umats_RESP_add = []
+    umats_RESP_rem = []
+    for imp in range( np.prod( cluster_size ) ):
+        umats_RESP_add.append( umatrix )
+        umats_RESP_rem.append( umatrix )
     
     for omega in Omegas:
 
-        EperSite_add, GF_add, notSC_GF_add = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'A' )
-        EperSite_rem, GF_rem, notSC_GF_rem = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'R' )
-        SpectralFunction       = - 2.0 * ( GF_add.imag + GF_rem.imag ) / math.pi # Factor of 2 due to summation over spin projection
-        SpectralFunction_notSC = - 2.0 * ( notSC_GF_add.imag + notSC_GF_rem.imag ) / math.pi
+        if ( doSelfConsistent==True ):
+            EperSite_add, GF_add, umats_RESP_add = theDMET.SolveResponse( umatrix, umats_RESP_add, Nelectrons, omega, eta, numBathOrbs, 'A' )
+            EperSite_rem, GF_rem, umats_RESP_rem = theDMET.SolveResponse( umatrix, umats_RESP_rem, Nelectrons, omega, eta, numBathOrbs, 'R' )
+        else:
+            EperSite_add, GF_add, dump = theDMET.SolveResponse( umatrix, umats_RESP_add, Nelectrons, omega, eta, numBathOrbs, 'A', 1 ) # At most 1 iteration and do not overwrite umats_RESP
+            EperSite_rem, GF_rem, dump = theDMET.SolveResponse( umatrix, umats_RESP_rem, Nelectrons, omega, eta, numBathOrbs, 'R', 1 )
+        SpectralFunction = - 2.0 * ( GF_add.imag + GF_rem.imag ) / math.pi # Factor of 2 due to summation over spin projection
         LDOS.append( SpectralFunction )
-        print "LDOS( U =",HubbardU,"; omega =",omega,") NOT self-consistent =",SpectralFunction_notSC
-        print "LDOS( U =",HubbardU,"; omega =",omega,")     self-consistent =",SpectralFunction
+        print "LDOS( U =",HubbardU,"; omega =",omega,") self-consistent =",SpectralFunction
 
     return LDOS
     

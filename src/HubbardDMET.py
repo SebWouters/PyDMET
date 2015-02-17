@@ -120,18 +120,18 @@ class HubbardDMET:
         print "***************************************************"
         return ( EnergyPerSiteCorr , umat_new )
         
-    def SolveResponse( self, umat_guess, Nelectrons, omega, eta, numBathOrbs, toSolve ):
+    def SolveResponse( self, umat_guess, umats_RESP_guess, Nelectrons, omega, eta, numBathOrbs, toSolve, maxiter=1000 ):
     
         # It doesn't make sense to match unnormalized RDMs.
         normalizedRDMs = True
 
         # Errortype 1 means sum( norm ( RDM difference ) )
         # Errortype 2 means norm( sum ( RDM difference ) )
-        errorType = 1
+        errorType = 2
         
         # If False, the real part of the RDM of |Psi^1> and |phi^1> is matched.
         # If True, the RDMs of the 3 separate kets a^{(dagger)} |Psi^0> and Re{ |Psi^1> } and Im{ |Psi^1> } are matched.
-        doDDMRGstates = False
+        doDDMRGstates = True
         
         # Define a few constants
         numImpOrbs = np.sum( self.impurityOrbs )
@@ -144,23 +144,32 @@ class HubbardDMET:
         umat_new_GS   = np.array( umat_guess, copy=True )
         umats_new_RESP = []
         for cnt in range( numImpOrbs ):
-            umats_new_RESP.append( np.array( umat_guess, copy=True ) )
+            umats_new_RESP.append( np.array( umats_RESP_guess[cnt], copy=True ) )
         isConverged   = False
         threshold_GS  = 1e-6 * numImpOrbs
-        threshold_RE  = 1e-5 * numImpOrbs
-        maxiter       = 1000
+        threshold_RE  = 1e-4
         iteration     = 0
-        #theDIISs = []
-        #for cnt in range( numImpOrbs ):
-        #    theDIISs.append( DIIS.DIIS(7) )
+        theDIISs      = []
+        DIISstarter   = 50
+        for cnt in range( numImpOrbs ):
+            theDIISs.append( DIIS.DIIS(2) )
+
+        # Fetch the chemical potential
+        theChemPotHam = HamFull.HamFull(self.Ham, self.cluster_size, umat_new_GS, umat_new_GS)
+        en_RHF, sol_RHF = LinalgWrappers.RestrictedHartreeFock( theChemPotHam.Tmat, numPairs, False )
+        chemical_potential_mu = 0.5 * ( en_RHF[ numPairs-1 ] + en_RHF[ numPairs ] )
+        if ( toSolve == 'A' ) or ( toSolve == 'R' ):
+            omegabis = omega + chemical_potential_mu # Shift omega with the chemical potential for the retarded Green's function
+        else:
+            omegabis = omega
 
         while (( not isConverged ) and ( iteration < maxiter )):
         
             iteration += 1
             print "*** DMET iteration",iteration,"***"
-            #if ( iteration > 1 ):
-            #    for cnt in range( numImpOrbs ):
-            #        umats_new_RESP[cnt] = theDIISs[cnt].Solve()
+            if ( iteration > DIISstarter+2 ):
+                for cnt in range( numImpOrbs ):
+                    umats_new_RESP[cnt] = theDIISs[cnt].Solve()
             umat_old_GS = np.array( umat_new_GS, copy=True )
             umats_old_RESP = []
             for cnt in range( numImpOrbs ):
@@ -177,12 +186,6 @@ class HubbardDMET:
             groundstate1RDMs = []
             for cnt in range( numImpOrbs ):
                 en_RHF, sol_RHF = LinalgWrappers.RestrictedHartreeFock( HamAugments[cnt].Tmat, numPairs, True )
-                if (( iteration == 1 ) and ( cnt == 0 )): #For the initial loop all u-matrices are equal to the initial guess ground-state one
-                    chemical_potential_mu = 0.5 * ( en_RHF[ numPairs-1 ] + en_RHF[ numPairs ] )
-                    if ( toSolve == 'A' ) or ( toSolve == 'R' ):
-                        omegabis = omega + chemical_potential_mu # Shift omega with the chemical potential for the retarded Green's function
-                    else:
-                        omegabis = omega
                 groundstate1RDMs.append( DMETorbitals.Construct1RDM_groundstate( sol_RHF, numPairs ) )
                 solutionsRHF.append( sol_RHF )
                 energiesRHF.append( en_RHF )
@@ -223,7 +226,7 @@ class HubbardDMET:
                     NelecActiveSpace = NelecActiveSpaceGuess_i
                 else:
                     assert( NelecActiveSpace == NelecActiveSpaceGuess_i )
-                print "   DMET :: Response (impurity", orb_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
+                #print "   DMET :: Response (impurity", orb_i, ") : Sum( min( NOON, 2-NOON ) , pure environment orbitals ) =", DiscOccupation_i
                 HamDMET_i = DMETham.DMETham( self.Ham, HamAugments[cnt], dmetOrbs_i, self.impurityOrbs, numImpOrbs, numBathOrbs )
                 HamDMETs.append( HamDMET_i )
                 
@@ -276,8 +279,6 @@ class HubbardDMET:
                     else:
                         ED_RDM_RESP.append( S_R * RDM_R + S_I * RDM_I )
             averageGSenergyPerSite = ( 1.0 * averageGSenergyPerSite ) / numImpOrbs
-            if ( iteration==1 ):
-                notSelfConsistentTotalGF = totalGFvalue
 
             # Find the new u-matrices with the two-step algorithm
             umat_new_GS = MinimizeCostFunction.MinimizeGS( umat_new_GS, ED_RDM_0, HamDMETs, numImpOrbs, NelecActiveSpace )
@@ -297,10 +298,13 @@ class HubbardDMET:
                 if ( normsOfDiff_RE[cnt] > threshold_RE ):
                     isConverged = False
             
-            #for cnt in range( numImpOrbs ):
-            #    error = umats_new_RESP[cnt] - umats_old_RESP[cnt]
-            #    error = np.reshape( error, error.shape[0]*error.shape[1] )
-            #    theDIISs[cnt].append( error, umats_new_RESP[cnt] )
+            if ( iteration > DIISstarter ):
+                for cnt in range( numImpOrbs ):
+                    if (normsOfDiff_RE[cnt] <= threshold_RE):
+                        theDIISs[cnt].flush()
+                    error = umats_new_RESP[cnt] - umats_old_RESP[cnt]
+                    error = np.reshape( error, error.shape[0]*error.shape[1] )
+                    theDIISs[cnt].append( error, umats_new_RESP[cnt] )
             
             print "   DMET :: The average ground-state energy per site =",averageGSenergyPerSite
             print "   DMET :: The Green's function value (correlated problem) =",totalGFvalue
@@ -317,5 +321,5 @@ class HubbardDMET:
         for cnt in range( numImpOrbs ):
             print umats_new_RESP[cnt]
         print "***************************************************"
-        return ( averageGSenergyPerSite, totalGFvalue, notSelfConsistentTotalGF )
+        return ( averageGSenergyPerSite, totalGFvalue, umats_new_RESP )
 

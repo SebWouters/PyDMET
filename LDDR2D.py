@@ -24,7 +24,7 @@ sys.path.append('src')
 import HubbardDMET
 import InsulatingPMguess
 
-def CalculateLDDR( HubbardU, Omegas, eta ):
+def CalculateLDDR( HubbardU, Omegas, eta, doSelfConsistent=True ):
 
     LDDR = []
 
@@ -40,16 +40,23 @@ def CalculateLDDR( HubbardU, Omegas, eta ):
     else:
         umat_guess = None
     GSenergyPerSite, umatrix = theDMET.SolveGroundState( Nelectrons, umat_guess )
+    umats_RESP_fw = []
+    umats_RESP_bw = []
+    for imp in range( np.prod( cluster_size ) ):
+        umats_RESP_fw.append( umatrix )
+        umats_RESP_bw.append( umatrix )
     
     for omega in Omegas:
-
-        EperSite_FW, GF_FW, notSC_GF_FW = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'F' )
-        EperSite_BW, GF_BW, notSC_GF_BW = theDMET.SolveResponse( umatrix, Nelectrons, omega, eta, numBathOrbs, 'B' )
-        SpectralFunction       = - ( GF_FW.imag - GF_BW.imag ) / math.pi
-        SpectralFunction_notSC = - ( notSC_GF_FW.imag - notSC_GF_BW.imag ) / math.pi
+        
+        if ( doSelfConsistent==True ):
+            EperSite_FW, GF_FW, umats_RESP_fw = theDMET.SolveResponse( umatrix, umats_RESP_fw, Nelectrons, omega, eta, numBathOrbs, 'F' )
+            EperSite_BW, GF_BW, umats_RESP_bw = theDMET.SolveResponse( umatrix, umats_RESP_bw, Nelectrons, omega, eta, numBathOrbs, 'B' )
+        else:
+            EperSite_FW, GF_FW, dump = theDMET.SolveResponse( umatrix, umats_RESP_fw, Nelectrons, omega, eta, numBathOrbs, 'F', 1 ) # At most 1 iteration and do not overwrite umats_RESP
+            EperSite_BW, GF_BW, dump = theDMET.SolveResponse( umatrix, umats_RESP_bw, Nelectrons, omega, eta, numBathOrbs, 'B', 1 )
+        SpectralFunction = - ( GF_FW.imag - GF_BW.imag ) / math.pi
         LDDR.append( SpectralFunction )
-        print "LDDR( U =",HubbardU,"; omega =",omega,") NOT self-consistent =",SpectralFunction_notSC
-        print "LDDR( U =",HubbardU,"; omega =",omega,")     self-consistent =",SpectralFunction
+        print "LDDR( U =",HubbardU,"; omega =",omega,") self-consistent =",SpectralFunction
     
     return LDDR
     

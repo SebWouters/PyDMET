@@ -52,7 +52,7 @@ class DMETham:
         if ( i < self.numImpOrbs ) and ( j < self.numImpOrbs ):
             return self.HamOrig.getTmat(self.conversions[i], self.conversions[j])
         else:
-            return self.Tmat[i, j]
+            return self.Tmat[i, j].real
 
     def getVmatCorr( self, i, j, k, l ):
         if ( i < self.numImpOrbs ) and ( j < self.numImpOrbs ) and ( k < self.numImpOrbs ) and ( l < self.numImpOrbs ):

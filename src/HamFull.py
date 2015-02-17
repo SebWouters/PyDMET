@@ -51,7 +51,7 @@ class HamFull:
     def ConstructFullTmat( self, cluster_size, umat_bulk, umat_imp ):
     
         # Make a copy of the original hopping matrix
-        Tmat = np.array( self.Ham.Tmat, copy=True )
+        Tmat = np.array( self.Ham.Tmat.astype(complex), copy=True )
         
         # Check that the cluster fits an integer times on the lattice
         steps = np.zeros( [self.Ham.dim], dtype=int )

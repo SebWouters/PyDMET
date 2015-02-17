@@ -31,7 +31,7 @@ def UmatFlat2SquareGS( umatflat, lindim ):
             umatsquare[row, col] = umatflat[ 1 + row + ( col * ( col - 1 ) ) / 2 ]
             umatsquare[col, row] = umatsquare[row, col]
     return umatsquare
-            
+
 def UmatSquare2FlatGS( umatsquare, lindim ):
 
     umatflat = np.zeros( [ 1 + ( lindim * ( lindim - 1 ) ) / 2 ], dtype=float )
@@ -40,8 +40,35 @@ def UmatSquare2FlatGS( umatsquare, lindim ):
         for col in range(row+1, lindim):
             umatflat[ 1 + row + ( col * ( col - 1 ) ) / 2 ] = umatsquare[row, col]
     return umatflat
-    
-'''def UmatFlat2SquareRESP( umatflat, lindim ):
+
+def UmatFlat2SquareRESP( umatflat, lindim ): # Complex Hermitian
+
+    umatsquare = np.zeros( [ lindim, lindim ], dtype=complex )
+    for row in range(0, lindim):
+        for col in range(row, lindim):
+            umatsquare[row, col] = umatflat[ row + ( col * ( col + 1 ) ) / 2 ]
+            umatsquare[col, row] = umatsquare[row, col]
+    offset = ( lindim * ( lindim + 1 ) ) / 2
+    for row in range(0, lindim):
+        for col in range(row+1, lindim):
+            value = umatflat[ offset + row + ( col * ( col - 1 ) ) / 2 ]
+            umatsquare[row, col] += 1j * value
+            umatsquare[col, row] -= 1j * value
+    return umatsquare
+
+def UmatSquare2FlatRESP( umatsquare, lindim ): # Complex Hermitian
+
+    umatflat = np.zeros( [ lindim * lindim ], dtype=float )
+    for row in range(0, lindim):
+        for col in range(row, lindim):
+            umatflat[ row + ( col * ( col + 1 ) ) / 2 ] = umatsquare[row, col].real
+    offset = ( lindim * ( lindim + 1 ) ) / 2
+    for row in range(0, lindim):
+        for col in range(row+1, lindim):
+            umatflat[ offset + row + ( col * ( col - 1 ) ) / 2 ] = umatsquare[row, col].imag
+    return umatflat
+
+def UmatFlat2SquareRESP2( umatflat, lindim ): # Real symmetric
 
     umatsquare = np.zeros( [ lindim, lindim ], dtype=float )
     for row in range(0, lindim):
@@ -49,14 +76,14 @@ def UmatSquare2FlatGS( umatsquare, lindim ):
             umatsquare[row, col] = umatflat[ row + ( col * ( col + 1 ) ) / 2 ]
             umatsquare[col, row] = umatsquare[row, col]
     return umatsquare
-            
-def UmatSquare2FlatRESP( umatsquare, lindim ):
 
-    umatflat = np.zeros( [ ( lindim * ( lindim + 1 ) ) / 2 ], dtype=float )
+def UmatSquare2FlatRESP2( umatsquare, lindim ): # Real symmetric
+
+    umatflat = np.zeros( [ ( lindim * (lindim + 1) ) / 2 ], dtype=float )
     for row in range(0, lindim):
         for col in range(row, lindim):
             umatflat[ row + ( col * ( col + 1 ) ) / 2 ] = umatsquare[row, col]
-    return umatflat'''
+    return umatflat
 
 def OneRDMdifferencesGS( umatsquare, GS_1RDMs, HamDMETs, numRDMs, numPairs ):
 
@@ -114,27 +141,27 @@ def RESP_1RDM_difference( umatsquare, RESP_1RDM, HamDMET, orb_i, numPairs, omega
     
 def CostFunctionResponse( umatflat, RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs ):
 
-    umatsquare = UmatFlat2SquareGS( umatflat, HamDMET.numImpOrbs )
+    umatsquare = UmatFlat2SquareRESP2( umatflat, HamDMET.numImpOrbs )
     errorRESP = RESP_1RDM_difference( umatsquare, RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs )
     totalError = np.linalg.norm( errorRESP )**2
     return totalError
     
 def RespNORMAL( umat_guess, RESP_1RDM, HamDMET, orb_i, NelecActiveSpace, omega, eta, toSolve, normalizedRDMs ):
 
-    umatflat = UmatSquare2FlatGS( umat_guess, HamDMET.numImpOrbs )
+    umatflat = UmatSquare2FlatRESP2( umat_guess, HamDMET.numImpOrbs )
 
     assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
-    #boundaries = []
-    #for element in umatflat:
-    #    boundaries.append( ( element-(1 + np.random.uniform(-0.1, 0.1)), element+(1 + np.random.uniform(-0.1,0.1)) ) )
-    #result = minimize( CostFunctionResponse, umatflat, args=(RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
-    result = minimize( CostFunctionResponse, umatflat, args=(RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs), options={'disp': False} )
+    boundaries = []
+    for element in umatflat:
+        boundaries.append( ( element-0.5*(1 + np.random.uniform(-0.1, 0.1)), element+0.5*(1 + np.random.uniform(-0.1,0.1)) ) )
+    result = minimize( CostFunctionResponse, umatflat, args=(RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
+    #result = minimize( CostFunctionResponse, umatflat, args=(RESP_1RDM, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs), options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message
     print "   MinimizeRESP :: Cost function after convergence =",result.fun
 
-    umatsquare = UmatFlat2SquareGS( result.x, HamDMET.numImpOrbs )
+    umatsquare = UmatFlat2SquareRESP2( result.x, HamDMET.numImpOrbs )
     return umatsquare
     
 def RESP_1RDM_differences_DDMRG( umatsquare, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs ):
@@ -162,7 +189,7 @@ def RESP_1RDM_differences_DDMRG( umatsquare, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDM
     
 def CostFunctionResponseDDMRG( umatflat, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs, errorType ):
 
-    umatsquare = UmatFlat2SquareGS( umatflat, HamDMET.numImpOrbs )
+    umatsquare = UmatFlat2SquareRESP2( umatflat, HamDMET.numImpOrbs )
     errorA, errorR, errorI = RESP_1RDM_differences_DDMRG( umatsquare, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs )
     if ( errorType == 1 ):
         totalError = np.linalg.norm( errorA )**2 + np.linalg.norm( errorR )**2 + np.linalg.norm( errorI )**2
@@ -172,20 +199,20 @@ def CostFunctionResponseDDMRG( umatflat, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, 
     
 def RespDDMRG( umat_guess, ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, NelecActiveSpace, omega, eta, toSolve, normalizedRDMs, errorType ):
 
-    umatflat = UmatSquare2FlatGS( umat_guess, HamDMET.numImpOrbs )
+    umatflat = UmatSquare2FlatRESP2( umat_guess, HamDMET.numImpOrbs )
 
     assert( NelecActiveSpace % 2 == 0 )
     numPairs = NelecActiveSpace / 2
-    #boundaries = []
-    #for element in umatflat:
-    #    boundaries.append( ( element-(1 + np.random.uniform(-0.1, 0.1)), element+(1 + np.random.uniform(-0.1,0.1)) ) )
-    #result = minimize( CostFunctionResponseDDMRG, umatflat, args=(ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs, errorType), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
-    result = minimize( CostFunctionResponseDDMRG, umatflat, args=(ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs, errorType), options={'disp': False} )
+    boundaries = []
+    for element in umatflat:
+        boundaries.append( ( element-0.5*(1 + np.random.uniform(-0.1, 0.1)), element+0.5*(1 + np.random.uniform(-0.1,0.1)) ) )
+    result = minimize( CostFunctionResponseDDMRG, umatflat, args=(ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs, errorType), method='L-BFGS-B', bounds=boundaries, options={'disp': False} )
+    #result = minimize( CostFunctionResponseDDMRG, umatflat, args=(ED_RDM_A, ED_RDM_R, ED_RDM_I, HamDMET, orb_i, numPairs, omega, eta, toSolve, normalizedRDMs, errorType), options={'disp': False} )
     if ( result.success==False ):
         print "   Minimize ::",result.message
     print "   MinimizeRESP :: Cost function after convergence =",result.fun
 
-    umatsquare = UmatFlat2SquareGS( result.x, HamDMET.numImpOrbs )
+    umatsquare = UmatFlat2SquareRESP2( result.x, HamDMET.numImpOrbs )
     return umatsquare
     
     
