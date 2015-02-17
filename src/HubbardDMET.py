@@ -149,8 +149,12 @@ class HubbardDMET:
         threshold_GS  = 1e-6 * numImpOrbs
         threshold_RE  = 1e-4
         iteration     = 0
+        
+        # Break up limit cycles with CDIIS
+        #    0 <= coeff <= 1
+        #    np.sum(coeff) = 1.0
         theDIISs      = []
-        DIISstarter   = 50
+        DIISstarter   = 30
         for cnt in range( numImpOrbs ):
             theDIISs.append( DIIS.DIIS(2) )
 
@@ -169,7 +173,7 @@ class HubbardDMET:
             print "*** DMET iteration",iteration,"***"
             if ( iteration > DIISstarter+2 ):
                 for cnt in range( numImpOrbs ):
-                    umats_new_RESP[cnt] = theDIISs[cnt].Solve()
+                    umats_new_RESP[cnt] = theDIISs[cnt].SolveCDIIS()
             umat_old_GS = np.array( umat_new_GS, copy=True )
             umats_old_RESP = []
             for cnt in range( numImpOrbs ):
@@ -300,7 +304,7 @@ class HubbardDMET:
             
             if ( iteration > DIISstarter ):
                 for cnt in range( numImpOrbs ):
-                    if (normsOfDiff_RE[cnt] <= threshold_RE):
+                    if ( normsOfDiff_RE[cnt] <= threshold_RE ):
                         theDIISs[cnt].flush()
                     error = umats_new_RESP[cnt] - umats_old_RESP[cnt]
                     error = np.reshape( error, error.shape[0]*error.shape[1] )

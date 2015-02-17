@@ -18,6 +18,7 @@
 '''
 
 import numpy as np
+from scipy.optimize import fmin_slsqp
 
 class DIIS:
 
@@ -55,5 +56,31 @@ class DIIS:
         for cnt in range(1, len(coeff)):
             thestate += coeff[cnt] * self.states[cnt]
         print "   DIIS :: Coefficients (latest first) = ",coeff[::-1]
+        return thestate
+        
+    def CDIIS_eq( self, coeff ):
+    
+        return np.array( [ np.sum(coeff) - 1.0 ] )
+        
+    def CDIIS_ineq( self, coeff ):
+    
+        return coeff
+        
+    def CDIIS_cost( self, coeff ):
+    
+        errorvec = self.errors[0] * coeff[0]
+        for cnt in range(1, len(self.errors)):
+            errorvec += self.errors[cnt] * coeff[cnt]
+        return np.linalg.norm( errorvec )**2
+        
+    def SolveCDIIS( self ):
+    
+        coeff = np.zeros([ len(self.errors) ], dtype=float)
+        coeff[ len(self.errors) - 1 ] = 1.0
+        result = fmin_slsqp( self.CDIIS_cost, coeff, f_eqcons=self.CDIIS_eq, f_ieqcons=self.CDIIS_ineq, iprint=0 )
+        thestate = result[0] * self.states[0]
+        for cnt in range(1, len(result)):
+            thestate += result[cnt] * self.states[cnt]
+        print "   CDIIS :: Coefficients (latest first) = ",result[::-1]
         return thestate
         
