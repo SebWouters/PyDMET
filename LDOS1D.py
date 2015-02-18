@@ -28,7 +28,7 @@ def CalculateLDOS( HubbardU, Omegas, eta, doSelfConsistent=True ):
     LDOS = []
 
     lattice_size = np.array( [ 960 ], dtype=int )
-    cluster_size = np.array( [   2 ], dtype=int )
+    cluster_size = np.array( [   4 ], dtype=int )
     Nelectrons   = np.prod( lattice_size ) # Half-filling
     antiPeriodic = True
     numBathOrbs  = np.prod( cluster_size ) + 2
